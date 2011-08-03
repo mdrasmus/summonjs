@@ -95,9 +95,24 @@ function group()
     return new Group(Array.prototype.slice.call(arguments));
 }
 
+
+// graphic functions
+
 function lines()
 {
     return new Graphic("lines", 
+		       Array.prototype.slice.call(arguments));
+}
+
+function lineStrip()
+{
+    return new Graphic("lineStrip", 
+		       Array.prototype.slice.call(arguments));
+}
+
+function triangles()
+{
+    return new Graphic("triangles",
 		       Array.prototype.slice.call(arguments));
 }
 
@@ -107,12 +122,22 @@ function quads()
 		       Array.prototype.slice.call(arguments));
 }
 
+function polygon()
+{
+    return new Graphic("polygon", 
+		       Array.prototype.slice.call(arguments));    
+}
+
 
 function style(data)
 {
     return {kind: "style",
 	    data: data};
 }
+
+
+
+// transform functions
 
 function translate(x, y)
 {
@@ -128,6 +153,11 @@ function rotate(r)
 {
     return new Rotate(r, Array.prototype.slice.call(arguments, 1, arguments.length));
 }
+
+
+
+
+//=============================================================================
 
 
 // create the Summon namespace
@@ -274,7 +304,7 @@ Canvas: function Canvas(canvas)
 
     //======================================================================
     // public methods
-    this.clear = function() {
+    this.clearDrawing = function() {
 	c.clearRect(0, 0, canvas.width, canvas.height);
     }
 
@@ -288,8 +318,12 @@ Canvas: function Canvas(canvas)
 	parent.remove(grp);
     }
 
+    this.clear = function(grp) {
+        that.world = group();
+    }
+
     this.draw = function() {
-	that.clear();
+	that.clearDrawing();
 
 	c.save();
 	//transformWorld();
@@ -346,10 +380,9 @@ drawElements: function drawElements(c, grp, transmat)
 	for (var i=0; i<grp.children.length; i++)
 	    drawElements(c, grp.children[i], transmat);
 	c.restore();
-    }
 
     // graphical elements
-    else if (elm == "lines") {
+    } else if (elm == "lines") {
         c.beginPath();
 	d = grp.data;
 	m0 = m[0]; m1=m[1]; m2=m[2]; m3=m[3]; m4=m[4]; m5=m[5];	
@@ -362,6 +395,36 @@ drawElements: function drawElements(c, grp, transmat)
         }
         c.stroke();
         c.closePath();
+
+    } else if (elm == "lineStrip") {
+        c.beginPath();
+	d = grp.data;
+	m0 = m[0]; m1=m[1]; m2=m[2]; m3=m[3]; m4=m[4]; m5=m[5];	
+
+        c.moveTo(d[0]*m0 + d[1]*m1 + m2,
+	         d[0]*m3 + d[1]*m4 + m5)
+        for (var i=2; i<d.length; i+=2) {
+            c.lineTo(d[i]*m0 + d[i+1]*m1 + m2,
+                     d[i]*m3 + d[i+1]*m4 + m5)
+        }
+        c.stroke();
+        c.closePath();
+
+    } else if (elm == "triangles") {
+        c.beginPath();
+	d = grp.data;
+        for (var i=0; i<d.length; i+=6) {
+	    v = multVecMatrix(transmat, d[i], d[i+1]);
+            c.moveTo(v[0], v[1]);
+	    v = multVecMatrix(transmat, d[i+2], d[i+3]);
+            c.lineTo(v[0], v[1]);
+	    v = multVecMatrix(transmat, d[i+4], d[i+5]);
+            c.lineTo(v[0], v[1]);
+	    v = multVecMatrix(transmat, d[i], d[i+1]);
+            c.lineTo(v[0], v[1]);
+        }
+        c.fill();
+        c.closePath();	
 	
     } else if (elm == "quads") {
         c.beginPath();
@@ -381,6 +444,21 @@ drawElements: function drawElements(c, grp, transmat)
         c.fill();
         c.closePath();	
 
+    } else if (elm == "polygon") {
+        c.beginPath();
+	d = grp.data;
+	v = multVecMatrix(transmat, d[0], d[1]);
+        c.moveTo(v[0], v[1]);
+        for (var i=2; i<d.length; i+=2) {
+	    v = multVecMatrix(transmat, d[i], d[i+1]);
+            c.lineTo(v[0], v[1]);
+        }
+	v = multVecMatrix(transmat, d[0], d[1]);
+        c.lineTo(v[0], v[1]);
+        c.fill();
+        c.closePath();
+
+
     // styles
     } else if (elm == "style") {
 	for (var key in grp.data) {
@@ -393,7 +471,7 @@ drawElements: function drawElements(c, grp, transmat)
     // transformations
     } else if (elm == "translate") {
         c.save();
-	transmat2 = multTransMatrix(transmat, grp.data[0], grp.data[1]);
+	var transmat2 = multTransMatrix(transmat, grp.data[0], grp.data[1]);
         //c.translate(grp.data[0], grp.data[1]);
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
@@ -401,14 +479,15 @@ drawElements: function drawElements(c, grp, transmat)
 
     } else if (elm == "rotate") {
         c.save();
-        c.rotate(grp.data[0] * Math.PI / 180);
+        //c.rotate(grp.data[0] * Math.PI / 180);
+        var transmat2 = multRotateMatrix(transmat, grp.data[0]);
         for (var i=0; i<grp.children.length; i++)
-            drawElements(c, grp.children[i], transmat);
+            drawElements(c, grp.children[i], transmat2);
         c.restore();
 
     } else if (elm == "scale") {
         c.save();
-	transmat2 = multScaleMatrix(transmat, grp.data[0], grp.data[1]);
+	var transmat2 = multScaleMatrix(transmat, grp.data[0], grp.data[1]);
         //c.scale(grp.data[0], grp.data[1]);
 	//c.lineWidth /= Math.min(grp.data[0], grp.data[1]);
 	
@@ -548,6 +627,32 @@ function multTransMatrix(m, x, y)
 	    m[6],
 	    m[7],
 	    m[6]*x + m[7]*y + m[8]];
+}
+
+
+function multRotateMatrix(m, r)
+{
+/* 
+   0 1 2
+   3 4 5
+   6 7 8
+*/
+
+    var s = Math.sin(r * (Math.PI/180.0));
+    var o = Math.cos(r * (Math.PI/180.0));
+    
+    return [
+        m[0] * o + m[1] * s,
+        m[1] * o - m[0] * s,
+        m[2],
+
+        m[3] * o + m[4] * s,
+        m[4] * o - m[3] * s,
+        m[5],
+
+        m[6] * o + m[7] * s,
+        m[7] * o - m[6] * s,
+        m[8]];
 }
 
 
