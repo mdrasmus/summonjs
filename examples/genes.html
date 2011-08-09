@@ -39,6 +39,7 @@ function startup()
     // redefine zooming
     s.setBinding(["keydown", "A"], s.doZoom(1.2, 1));
     s.setBinding(["keydown", "Z"], s.doZoom(1/1.2, 1));
+    s.setBinding(["mouse", "wheel",], s.doMouseWheel(true, false));
 
 
 }

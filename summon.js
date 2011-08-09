@@ -244,11 +244,12 @@ Canvas: function Canvas(canvas)
     function mouseWheel(e)
     {
 	var delta = calcMouseWheelDelta(e);
+        var mod = getKeyMod(e);
 
         // lookup callback
-        var func = bindings.mouse["wheel"];
+        var func = bindings.mouse["wheel" + mod];
         if (func) 
-            func(e, delta);
+            func(delta);
 
         // Prevent default actions caused by mouse wheel.
         if (e.preventDefault)
@@ -378,7 +379,7 @@ Canvas: function Canvas(canvas)
     };
 
     this.focusWindow = function(x, y) {
-	pt = windowToWorld(x, y);
+	var pt = windowToWorld(x, y);
 	this.focus(pt[0], pt[1]);
     };
 
@@ -389,34 +390,32 @@ Canvas: function Canvas(canvas)
         };
     };
 
-    this.doZoom = function(x, y) {
+    this.doZoom = function(x, y, mode) {
+        var mode = (arguments.length > 2) ? arguments[2] : "center";
         return function() {
-            that.focusWindow(canvas.width/2, canvas.height/2);
+            if (mode == "center") {
+                that.focusWindow(canvas.width/2, canvas.height/2);
+            } else if (mode == "mouse") {
+                that.focusWindow(mousePt[0], mousePt[1]);
+            }
             that.zoom(x, y);
             that.draw();
         };
     };
 
 
-    this.mouseWheelDefault = function(e, delta) {
-	if (delta) {
-            var pt = windowToWorld(mousePt[0], mousePt[1]);
-	    that.focus(pt[0], pt[1]);
-
-	    var zoom = 1.0;
-	    if (delta > 0)
-		zoom = Math.pow(1.1, delta);
-	    else
-		zoom = 1.0 / Math.pow(1.1, -delta);
-
-	    if (e.shiftKey)
-		that.zoom(1.0, zoom);
-	    else if (e.ctrlKey)
-		that.zoom(zoom, 1.0);
-	    else
-		that.zoom(zoom, zoom);
-	    that.draw();
-	}        
+    this.doMouseWheel = function(x, y) {
+        return function(delta) {
+            var z = Math.pow(1.1, delta);
+            that.focusWindow(mousePt[0], mousePt[1]);
+            if (x && y)
+                that.zoom(z, z);
+            else if (x)
+                that.zoom(z, 1);
+            else if (y)
+                that.zoom(1, z);
+            that.draw();
+        }
     }
 
 
@@ -454,6 +453,25 @@ Canvas: function Canvas(canvas)
     }
 
 
+    function parseKeyMod(input) {
+        var mod = "";
+        if (input.indexOf("shift") != -1) 
+            mod += "+shift";
+        if (input.indexOf("ctrl") != -1) 
+            mod += "+ctrl";
+        return mod;
+    }
+
+    function getKeyMod(e) {
+        var mod = "";
+	if (e.shiftKey)
+	    mod += "+shift";
+	else if (e.ctrlKey)
+	    mod += "+ctrl";
+        return mod;
+    }
+
+
     this.setBinding = function(input, func) {
         if (input[0] == "keydown") {
             if (typeof input[1] == "number") {
@@ -461,8 +479,11 @@ Canvas: function Canvas(canvas)
             }
             
             bindings.keydown[input[1]] = func;
+        } else if (input[0] == "mouse") {
+            var mod = parseKeyMod(input.slice(2));
+            bindings[input[0]][input[1] + mod] = func;
         } else {
-            bindings[input[0]][input[1]] = func;
+            throw "unknown input " + input
         }
     };
 
@@ -476,7 +497,11 @@ Canvas: function Canvas(canvas)
         this.setBinding(["keydown", "A"], this.doZoom(1.2, 1.2));
         this.setBinding(["keydown", "Z"], this.doZoom(1/1.2, 1/1.2));
 
-        this.setBinding(["mouse", "wheel"], this.mouseWheelDefault);
+        this.setBinding(["mouse", "wheel"], this.doMouseWheel(true, true));
+        this.setBinding(["mouse", "wheel", "shift"], 
+                        this.doMouseWheel(false, true));
+        this.setBinding(["mouse", "wheel", "ctrl"], 
+                        this.doMouseWheel(true, false));
     }
 
 
