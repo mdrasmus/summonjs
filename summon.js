@@ -44,6 +44,8 @@ function Group(children)
     this.children = children;
 
     Group.prototype.push = function push(x) {
+        if (x.parent != null)
+            throw "Element already has parent";
 	x.parent = this;
 	this.children.push(x);
 	return x;
@@ -53,6 +55,12 @@ function Group(children)
 	var i = this.children.indexOf(x);
 	this.children.splice(i, 1);
     };
+
+    Group.prototype.replace = function replace(oldGrp, newGrp) {
+	var i = this.children.indexOf(x);
+        this.children[i].parent = null;
+        this.children[i] = newGrp;
+    }
 }
 
 function Translate(x, y, children)
@@ -83,11 +91,15 @@ function Rotate(r, children)
 function Graphic(kind, data)
 {
     this.kind = kind;
+    this.parent = null;
     this.data = data;
 
     Graphic.prototype.push = function push(x) {
 	this.data.push(x);
     };
+    Graphic.prototype.removeSelf = function removeSelf() {
+        this.parent.remove(this);
+    }
 }
 
 function group()
@@ -164,6 +176,14 @@ function rotate(r)
 var Summon = Summon || {
 
 
+// keycodes
+    KEY_RIGHT: 39,
+    KEY_LEFT: 37,
+    KEY_UP: 38,
+    KEY_DOWN: 40,
+
+
+
 Camera: function Camera()
 {
     this.trans = [0, 0];
@@ -177,6 +197,9 @@ Canvas: function Canvas(canvas)
     var that = this;
     var c = canvas.getContext("2d");
     var camera = new Summon.Camera();
+    var bindings = {keydown: {}, 
+                    keyup: {},
+                    mouse: {}};
 
     // mouse info
     var mouseState = "up";
@@ -185,32 +208,22 @@ Canvas: function Canvas(canvas)
     // models
     this.world = group();
 
-    // event handlers
-    function test(e)
-    {
-        x = e.clientX - canvas.offsetLeft;
-        y = e.clientY - canvas.offsetTop;
-	//that.focus(x, y);
-
-	console.log(camera.trans);
-	console.log(camera.focus);
-
-	that.draw();
-    }
-
 
     function mouseMove(e)
     {
+        x = e.clientX - canvas.offsetLeft;
+        y = e.clientY - canvas.offsetTop;
+
 	if (mouseState == "down") {
-            x = e.clientX - canvas.offsetLeft;
-            y = e.clientY - canvas.offsetTop;
 	    dx = x - mousePt[0];
 	    dy = y - mousePt[1];
-	    mousePt = [x, y];
 	    camera.trans[0] += dx;
 	    camera.trans[1] += dy;
+            mousePt = [x, y];
 	    that.draw();
-	}
+	} else {
+            mousePt = [x, y];
+        }   
     }
 
     function mouseDown(e)
@@ -230,28 +243,12 @@ Canvas: function Canvas(canvas)
 
     function mouseWheel(e)
     {
-	delta = calcMouseWheelDelta(e);
+	var delta = calcMouseWheelDelta(e);
 
-	if (delta) {
-            x = e.clientX - canvas.offsetLeft;
-            y = e.clientY - canvas.offsetTop;
-	    pt = windowToWorld(x, y);
-	    that.focus(pt[0], pt[1]);
-
-	    var zoom = 1.0;
-	    if (delta > 0)
-		zoom = Math.pow(1.1, delta);
-	    else
-		zoom = 1.0 / Math.pow(1.1, -delta);
-
-	    if (e.shiftKey)
-		that.zoom(1.0, zoom);
-	    else if (e.ctrlKey)
-		that.zoom(zoom, 1.0);
-	    else
-		that.zoom(zoom, zoom);
-	    that.draw();
-	}
+        // lookup callback
+        var func = bindings.mouse["wheel"];
+        if (func) 
+            func(e, delta);
 
         // Prevent default actions caused by mouse wheel.
         if (e.preventDefault)
@@ -259,8 +256,25 @@ Canvas: function Canvas(canvas)
 	e.returnValue = false;
     }
 
+
+    function keyDown(e)
+    {
+        var charCode = e.which;
+        var charStr = String.fromCharCode(charCode);
+
+        // lookup by charCode
+        var func = bindings.keydown["code" + charCode];
+        if (func) 
+            return func();
+
+        // lookup by charStr
+        func = bindings.keydown[charStr];
+        if (func) 
+            return func();
+    }
     
     //======================================================================
+    // coordinate conversions
     
     function windowToWorld(x, y)
     {
@@ -268,6 +282,21 @@ Canvas: function Canvas(canvas)
 		camera.focus[0],
 		(y - camera.trans[1] - camera.focus[1]) / camera.zoom[1] +
 		camera.focus[1]];
+    }
+
+
+    function getCameraTransmat()
+    {	    
+	var transmat = makeIdentityMatrix();
+
+	// perform translation
+	transmat = multTransMatrix(transmat, camera.trans[0], camera.trans[1]);
+	
+	// perform zoom with respect to focus point
+	transmat = multTransMatrix(transmat, camera.focus[0], camera.focus[1]);
+	transmat = multScaleMatrix(transmat, camera.zoom[0], camera.zoom[1]);
+	transmat = multTransMatrix(transmat, -camera.focus[0], -camera.focus[1]);
+	return transmat;
     }
 
 
@@ -287,40 +316,31 @@ Canvas: function Canvas(canvas)
 	c.translate(-camera.focus[0], -camera.focus[1]);
     }
 
-    function getCameraTransmat()
-    {	    
-	var transmat = makeIdentityMatrix();
-
-	// perform translation
-	transmat = multTransMatrix(transmat, camera.trans[0], camera.trans[1]);
-	
-	// perform zoom with respect to focus point
-	transmat = multTransMatrix(transmat, camera.focus[0], camera.focus[1]);
-	transmat = multScaleMatrix(transmat, camera.zoom[0], camera.zoom[1]);
-	transmat = multTransMatrix(transmat, -camera.focus[0], -camera.focus[1]);
-	return transmat;
-    }
-
 
     //======================================================================
-    // public methods
+    // model methods
+
     this.clearDrawing = function() {
 	c.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    };
 
     this.add = function(grp) {
 	that.world.push(grp);
 	return grp;
-    }
+    };
 
     this.remove = function(grp) {
 	parent = grp.parent;
 	parent.remove(grp);
-    }
+    };
 
     this.clear = function(grp) {
         that.world = group();
-    }
+    };
+
+
+    //=====================================================================
+    // drawing methods
 
     this.draw = function() {
 	that.clearDrawing();
@@ -330,33 +350,151 @@ Canvas: function Canvas(canvas)
 
 	Summon.drawElements(c, that.world, getCameraTransmat());
 	c.restore();
-    }
+    };
 
+    //=======================
+    // camera methods
 
     this.translate = function(x, y) {
 	camera.trans[0] -= x;
 	camera.trans[1] -= y;
-    }
+    };
 
     this.zoom = function(x, y) {
 	camera.zoom[0] *= x;
 	camera.zoom[1] *= y;
-    }
+    };
 
     this.focus = function(x, y) {
+        if (arguments.length == 0) {
+	    pt = windowToWorld(mousePt[0], mousePt[1]);
+	    x = pt[0]; y = pt[1];
+        }
+
 	camera.trans[0] += (camera.focus[0]-x) * (1.0 - camera.zoom[0]);
 	camera.trans[1] += (camera.focus[1]-y) * (1.0 - camera.zoom[1]);
 	camera.focus[0] = x;
 	camera.focus[1] = y;
+    };
+
+    this.focusWindow = function(x, y) {
+	pt = windowToWorld(x, y);
+	this.focus(pt[0], pt[1]);
+    };
+
+    this.doTranslate = function(x, y) {
+        return function() {
+            that.translate(x, y);
+            that.draw();
+        };
+    };
+
+    this.doZoom = function(x, y) {
+        return function() {
+            that.focusWindow(canvas.width/2, canvas.height/2);
+            that.zoom(x, y);
+            that.draw();
+        };
+    };
+
+
+    this.mouseWheelDefault = function(e, delta) {
+	if (delta) {
+            var pt = windowToWorld(mousePt[0], mousePt[1]);
+	    that.focus(pt[0], pt[1]);
+
+	    var zoom = 1.0;
+	    if (delta > 0)
+		zoom = Math.pow(1.1, delta);
+	    else
+		zoom = 1.0 / Math.pow(1.1, -delta);
+
+	    if (e.shiftKey)
+		that.zoom(1.0, zoom);
+	    else if (e.ctrlKey)
+		that.zoom(zoom, 1.0);
+	    else
+		that.zoom(zoom, zoom);
+	    that.draw();
+	}        
     }
 
+
+    this.getSize = function() {
+        return [canvas.width, canvas.height];
+    };
+
+    this.setVisible = function(x1, y1, x2, y2, mode)
+    {
+        // ensure coordinates are properly ordered
+        if (x1 > x2) {
+            var t = x1; x1 = x2; x2 = t;
+        }
+        if (y1 > y2) {
+            var t = y1; y1 = y2; y2 = t;
+        }
+
+        // do not allow empty bounding box
+        if (x1 == x2 || y1 == y2)
+            throw "can't set visible to an empty bounding box";
+
+        // get window dimensions
+        var winsize = this.getSize();
+        
+        // do nothing if window has zero width or height
+        if (winsize[0] == 0 || winsize[1] == 0)
+            return;
+        
+        // set visible according to mode
+        //if (mode == "exact") {
+        camera.focus = [x1, y1];
+        camera.zoom = [winsize[0] / (x2 - x1), winsize[1] / (y2 - y1)];
+        camera.trans = [-x1, -y1];
+        this.draw();
+    }
+
+
+    this.setBinding = function(input, func) {
+        if (input[0] == "keydown") {
+            if (typeof input[1] == "number") {
+                input[1] = "code" + input[1];
+            }
+            
+            bindings.keydown[input[1]] = func;
+        } else {
+            bindings[input[0]][input[1]] = func;
+        }
+    };
+
+
+    this.setDefaultBindings = function() {
+        this.setBinding(["keydown", Summon.KEY_RIGHT],this.doTranslate(100, 0));
+        this.setBinding(["keydown", Summon.KEY_LEFT],this.doTranslate(-100, 0));
+        this.setBinding(["keydown", Summon.KEY_UP],this.doTranslate(0, -100));
+        this.setBinding(["keydown", Summon.KEY_DOWN],this.doTranslate(0, 100));
+
+        this.setBinding(["keydown", "A"], this.doZoom(1.2, 1.2));
+        this.setBinding(["keydown", "Z"], this.doZoom(1/1.2, 1/1.2));
+
+        this.setBinding(["mouse", "wheel"], this.mouseWheelDefault);
+    }
+
+
+    //================
     // init
-    //addEventListener(canvas, "click", "onclick", test)
     addEventListener(canvas, "mousemove", "onmousemove", mouseMove)
     addEventListener(canvas, "mousedown", "onmousedown", mouseDown)
     addEventListener(canvas, "mouseup", "onmouseup", mouseUp)
     addEventListener(canvas, "DOMMouseScroll", "onmousewheel", mouseWheel)
     addEventListener(canvas, "mousewheel", "", mouseWheel)
+
+    canvas.onkeydown = keyDown;
+
+    canvas.tabIndex = 1;
+
+    // default bindings
+    this.setDefaultBindings();
+
     c.strokeStyle = c.fillStyle = "black";
 },
 
