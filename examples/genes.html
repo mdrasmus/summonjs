@@ -22,21 +22,30 @@ function startup()
         x = x2;
     }
 
+    function func(i) {
+        return function () {
+            alert("gene "+i);
+            };
+    }
 
     // draw genes
     var g = quads();
+    var h = group();
     var t = group(style({stroke: "white"}));
     for (var i=0; i<genes.length; i++) {
         var x = genes[i];
         g.data.push.apply(g.data, [x[0], 0, x[0], 1, 
                                    x[1], 1, x[1], 0]);
+        h.push(hotspot(x[0], 0, x[1], 1, func(i)));
         t.push(textLabel("gene "+i, x[0], .25, x[1], 1, {minsize: 10}));
     }
 
-    s.add(scale(1, 1, g, t));
+    s.add(translate(100, 0, g, t, h));
+    s.home();
+    s.focusCenter();
+    s.zoom(1, .1);
     s.draw();
-    s.setVisible(0, -5, x2, 5);
-
+    
     // redefine zooming
     s.setBinding(["keydown", "A"], s.doZoom(1.2, 1));
     s.setBinding(["keydown", "Z"], s.doZoom(1/1.2, 1));
