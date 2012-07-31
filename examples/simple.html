@@ -32,6 +32,13 @@ function startup()
           style({stroke: "red", fill: "blue"}),
           quads(400, 20, 500, 20,
                 500, 60, 400, 50),
+          triangles(600, 10, 700, 10, 650, 50),
+          translate(-500, -300, 
+            polygon(600, 400, 
+                  700, 450, 
+                  700, 500, 
+                  650, 510, 
+                  620, 500)),
           lines(0, 0, 50, 50)),
         translate(100, 100,
             scale(2, 2, lines(0, 0, 100, 100, 
@@ -50,6 +57,7 @@ function startup()
 
     var g = s.add(quads(0, 0, 0, 400, 400, 400, 400, 0));
     s.remove(g);
+
 
     s.draw();
 }

@@ -1,0 +1,64 @@
+<html>
+
+<style><!--
+#canvas { border: 1px solid #000; }
+--></style>
+
+<script language="JavaScript" src="../summon.js"></script>
+<script language="JavaScript"><!--
+
+function startup()
+{
+    var canvas = document.getElementById("canvas");
+    var s = new Summon.Canvas(canvas);
+
+    // make dummy data
+    var genes = [];
+    var x = 0, x2 = 0;
+    for (var i=0; i<1000; i++) {
+        x += Math.random() * 2000;
+        x2 = x + Math.random() * 1000;
+        genes.push([x, x2]);
+        x = x2;
+    }
+
+    function func(i) {
+        return function () {
+            alert("gene "+i);
+            };
+    }
+
+    // draw genes
+    var g = quads();
+    var h = group();
+    var t = group(style({stroke: "white"}));
+    for (var i=0; i<genes.length; i++) {
+        var x = genes[i];
+        g.data.push.apply(g.data, [x[0], 0, x[0], 1, 
+                                   x[1], 1, x[1], 0]);
+        h.push(hotspot(x[0], 0, x[1], 1, func(i)));
+        t.push(textLabel("gene "+i, x[0], .25, x[1], 1, {minsize: 10}));
+    }
+
+    s.add(translate(100, 0, g, t, h));
+    s.home();
+    s.focusCenter();
+    s.zoom(1, .1);
+    s.draw();
+    
+    // redefine zooming
+    s.setBinding(["keydown", "A"], s.doZoom(1.2, 1));
+    s.setBinding(["keydown", "Z"], s.doZoom(1/1.2, 1));
+    s.setBinding(["mouse", "wheel"], s.doMouseWheel(true, false));
+
+}
+
+--></script>
+
+
+<body onload="startup();">
+
+<canvas id="canvas" width="800" height="400"></canvas>
+
+</body>
+</html>
