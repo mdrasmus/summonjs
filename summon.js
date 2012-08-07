@@ -1,10 +1,22 @@
 
 
-// include
-//document.write('<script language="JavaScript" src="canvastext.js"></script>');
-
-
 //=============================================================================
+
+
+// log a message to the error console
+function logMessage(msg)
+{
+    setTimeout(function() {
+            throw new Error(msg);
+        }, 0);
+}
+
+// log a json object to the error console
+function logJSON(json)
+{
+    logMessage(JSON.stringify(json));
+}
+
 
 function addEventListener(obj, event, event2, callback)
 {
@@ -139,6 +151,19 @@ Rotate.prototype.getMatrix = function()
     return makeRotateMatrix(this.data[0]);
 }
 
+function ZoomClamp(options, children)
+{
+    this.parent = null;
+    this.children = children;
+    this.data = options;
+}
+ZoomClamp.prototype = new Transform;
+ZoomClamp.prototype.kind = "zoomClamp";
+ZoomClamp.prototype.getMatrix = function()
+{
+    return identityMatrix;
+}
+
 function Graphic(kind, data)
 {
     this.kind = kind;
@@ -268,6 +293,10 @@ function rotate(r)
     return new Rotate(r, Array.prototype.slice.call(arguments, 1, arguments.length));
 }
 
+function zoomClamp(options)
+{
+    return new ZoomClamp(options, Array.prototype.slice.call(arguments, 1, arguments.length));
+}
 
 
 function hotspot(x1, y1, x2, y2, func)
@@ -287,10 +316,10 @@ var Summon = Summon || {
 
 
 // keycodes
-    KEY_RIGHT: 39,
-    KEY_LEFT: 37,
-    KEY_UP: 38,
-    KEY_DOWN: 40,
+KEY_RIGHT: 39,
+KEY_LEFT: 37,
+KEY_UP: 38,
+KEY_DOWN: 40,
 
 
 
@@ -321,14 +350,19 @@ Canvas: function Canvas(canvas)
 
     function getWindowMousePoint(e)
     {
-        return [e.clientX - canvas.offsetLeft,
-                e.clientY - canvas.offsetTop];
+        //return [e.clientX - canvas.offsetLeft,
+        //        e.clientY - canvas.offsetTop];
+        return [e.pageX - canvas.offsetLeft,
+                e.pageY - canvas.offsetTop];
+
     }
 
     function getScreenMousePoint(e)
     {
-        return [e.clientX - canvas.offsetLeft,
-                canvas.height - e.clientY + canvas.offsetTop];
+        //return [e.clientX - canvas.offsetLeft,
+        //        canvas.height - e.clientY + canvas.offsetTop];
+        return [e.pageX - canvas.offsetLeft,
+                canvas.height - e.pageY + canvas.offsetTop];
     }
 
     function mouseMove(e)
@@ -788,13 +822,20 @@ drawElements: function drawElements(c, grp, transmat)
         var textWidth2 = c.measureText(font, textHeight, text);
         var transmat2 = multScaleMatrix(multTransMatrix(transmat, d[0], d[1]), 
                                         textWidth / textWidth2, -1);
+
         if (options.minsize) {
             var zoom = getMatrixZoom(transmat2);
             if (zoom[0]*textWidth2 < options.minsize ||
-                zoom[1]*textHeight < options.minsize)
-                return;
+                zoom[1]*textHeight < options.minsize) {
+                if (options.clip)
+                    return;
+                else {
+                    transmat2 = multScaleMatrix(transmat2, 1, 
+                                                options.minsize / zoom[1]);
+                }
+            }
         }
-
+        
         c.drawText(font, textHeight, 0, 0, text, transmat2);
 
 
@@ -811,14 +852,12 @@ drawElements: function drawElements(c, grp, transmat)
     } else if (elm == "translate") {
         c.save();
 	var transmat2 = multTransMatrix(transmat, grp.data[0], grp.data[1]);
-        //c.translate(grp.data[0], grp.data[1]);
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
         c.restore();
 
     } else if (elm == "rotate") {
         c.save();
-        //c.rotate(grp.data[0] * Math.PI / 180);
         var transmat2 = multRotateMatrix(transmat, grp.data[0]);
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
@@ -827,14 +866,16 @@ drawElements: function drawElements(c, grp, transmat)
     } else if (elm == "scale") {
         c.save();
 	var transmat2 = multScaleMatrix(transmat, grp.data[0], grp.data[1]);
-        //c.scale(grp.data[0], grp.data[1]);
-	//c.lineWidth /= Math.min(grp.data[0], grp.data[1]);
-	
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
         c.restore();
-
-
+    } else if (elm == "zoomClamp") {
+        c.save();
+        var zoom = getMatrixZoom(transmat);
+	var transmat2 = multScaleMatrix(transmat, 1/zoom[0], 1/zoom[1]);
+        for (var i=0; i<grp.children.length; i++)
+            drawElements(c, grp.children[i], transmat2);
+        c.restore();        
     }
 },
 
@@ -885,8 +926,12 @@ drawElements: function drawElements(c, grp, transmat)
 //=============================================================================
 // transforms
 
-
-
+// matrices are stored as row-major arrays with the following format
+//
+// 0 1 2
+// 3 4 5
+// 6 7 8
+//
 
 function makeTransMatrix(x, y)
 {
@@ -926,11 +971,6 @@ identityMatrix = [1, 0, 0,
 
 function multMatrix(a, b)
 {
-/*
-0 1 2
-3 4 5
-6 7 8
-*/
     return [a[0]*b[0] + a[1]*b[3] + a[2]*b[6],
 	    a[0]*b[1] + a[1]*b[4] + a[2]*b[7],
 	    a[0]*b[2] + a[1]*b[5] + a[2]*b[8],
@@ -947,16 +987,6 @@ function multMatrix(a, b)
 
 function multTransMatrix(m, x, y)
 {
-/* 
-   0 1 2
-   3 4 5
-   6 7 8
-
-   0  1  2  3
-   4  5  6  7
-   8  9  10 11
-   12 13 14 15
-*/
     return [m[0],
 	    m[1],
 	    m[0]*x + m[1]*y + m[2],
@@ -973,12 +1003,6 @@ function multTransMatrix(m, x, y)
 
 function multRotateMatrix(m, r)
 {
-/* 
-   0 1 2
-   3 4 5
-   6 7 8
-*/
-
     var s = Math.sin(r * (Math.PI/180.0));
     var o = Math.cos(r * (Math.PI/180.0));
     
@@ -1000,11 +1024,6 @@ function multRotateMatrix(m, r)
 
 function multScaleMatrix(m, x, y)
 {
-/* 
-   0 1 2
-   3 4 5
-   6 7 8
-*/
     return [m[0]*x, m[1]*y, m[2],
 	    m[3]*x, m[4]*y, m[5],
 	    m[6]*x, m[7]*y, m[8]];
@@ -1014,11 +1033,6 @@ function multScaleMatrix(m, x, y)
 
 function multVecMatrix(m, x, y)
 {
-/*
-0 1 2
-3 4 5
-6 7 8
-*/
     return [x*m[0] + y*m[1] + m[2],
 	    x*m[3] + y*m[4] + m[5]];
 }

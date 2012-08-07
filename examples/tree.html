@@ -1,0 +1,86 @@
+<html>
+
+<style><!--
+#canvas { border: 1px solid #000; }
+--></style>
+
+<script language="JavaScript" src="../summon.js"></script>
+<script language="JavaScript" src="newick.js"></script>
+<script language="JavaScript" src="tree.js"></script>
+<script language="JavaScript"><!--
+
+function drawTree(tree, layout)
+{
+    var ages = getTreeAges(tree);
+    if (typeof layout == "undefined")
+        layout = layoutTree(tree, {x:0, y:ages[tree.root], yscale: -1.0});
+        
+    var g = group();
+    
+    function walk(name) {
+        var size = 1;
+        var node = tree.nodes[name];
+        
+        var x = layout[name][0];
+        var y = layout[name][1];
+        
+        if (node.parent) {            
+            var px = layout[node.parent][0];
+            var py = layout[node.parent][1];
+            g.push(lines(x, y, x, py));
+        }
+        
+        if (node.children.length > 0) {
+            var n = node.children.length;
+            var x1 = layout[node.children[0]][0];
+            var x2 = layout[node.children[n-1]][0];
+            
+            g.push(lines(x1, y, x2, y));
+            
+            for (var i in node.children)
+                walk(node.children[i]);
+        }
+    }
+    walk(tree.root);
+
+    // draw labels
+    var w = 10;
+    var h = 12;
+    for (var name in tree.nodes) {
+        if (tree.nodes[name].children.length == 0) {
+            var x = layout[name][0];
+            var y = layout[name][1];
+            g.push(translate(x, y, zoomClamp({},
+                    textLabel("" + name, -w/2, -h, w/2, 0))));
+        }
+    }
+
+    return g;
+}
+
+
+function startup()
+{
+    var canvas = document.getElementById("canvas");
+    var s = new Summon.Canvas(canvas);
+
+    var newick = "((3:6441.628830[&&NHX:],((13:878.079433[&&NHX:],18:878.079433[&&NHX:])32:0.000000[&&NHX:],(8:568.823882[&&NHX:],9:568.823882[&&NHX:])35:309.255551[&&NHX:])34:5563.549397[&&NHX:])25:13916.832241[&&NHX:],(((1:6441.628830[&&NHX:],(12:4373.253849[&&NHX:],((17:1330.330768[&&NHX:],(7:878.079433[&&NHX:],4:878.079433[&&NHX:])20:452.251335[&&NHX:])33:1628.540428[&&NHX:],(2:878.079433[&&NHX:],(15:357.350773[&&NHX:],(6:212.742615[&&NHX:],5:212.742615[&&NHX:])36:144.608158[&&NHX:])22:520.728660[&&NHX:])38:2080.791763[&&NHX:])30:1414.382653[&&NHX:])28:2068.374981[&&NHX:])27:3024.764939[&&NHX:],(19:1991.697298[&&NHX:],(11:1330.330768[&&NHX:],0:1330.330768[&&NHX:])21:661.366530[&&NHX:])29:7474.696471[&&NHX:])24:4423.377298[&&NHX:],(10:2958.871196[&&NHX:],(14:2958.871196[&&NHX:],16:2958.871196[&&NHX:])23:0.000000[&&NHX:])37:10930.899871[&&NHX:])26:6468.690004[&&NHX:])31:0.000000[&&NHX:];"
+
+    tree = parseNewick(newick);
+    s.add(drawTree(tree));
+    s.home();
+    s.focusCenter();
+    s.zoom(.8, .8);
+
+    s.draw();
+}
+
+--></script>
+
+
+<body onload="startup();">
+
+<canvas id="canvas" width="800" height="400"></canvas>
+
+</body>
+</html>
