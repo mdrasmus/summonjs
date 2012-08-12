@@ -8,6 +8,14 @@
 
 function setup() {
 
+    // syntax of used summon functions
+    // s.add( <group> )    = adds a group of graphics to the screen
+    // group( <elements> ) = creates a group from several graphical elements
+    // lines( x1, y1, x2, y2, ... )  = an element that draws one or more lines
+    // quads( x1, y1, ..., x4, y4, ... )  = an element that draws one or more quadrilaterals
+    // style({fill: <color>, stoke: <color>, ...}) = a primitive that specifies a color style
+
+
     // setup canvas
     var canvas = document.getElementById("canvas");
     var s = new Summon.Canvas(canvas);
@@ -29,10 +37,12 @@ function setup() {
 
     // add some text below everything else
     s.add(textLabel("Hello, world!",    // text to appear
-          0, -10, 140, -100));          // bounding box of text
+          0, -10, 140, -40));          // bounding box of text
 
     // center the "camera" so that all shapes are in view
     s.home();
+
+    // zoom out a little bit
     s.focusCenter();
     s.zoom(.8, .8);
     s.draw();
@@ -44,8 +54,20 @@ function setup() {
 </head>
 <body onload="setup();">
 
+<div class="topbar">
+<a href="./">summon.js examples</a>
+</div>
+
 <!-- main canvas element -->
 <canvas id="canvas" width="800" height="400"></canvas>
+
+
+<div class="explain">
+<p>
+This example shows some basic drawing commands of summon.js.  
+</p>
+<div>
+
 
 </body>
 </html>

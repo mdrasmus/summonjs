@@ -8,11 +8,6 @@
 
 function setup() {
 
-    // setup canvas
-    var canvas = document.getElementById("canvas");
-    var s = new Summon.Canvas(canvas);
-
-
     // a function for drawing a commonly used shape
     function arrow() {
     
@@ -37,6 +32,14 @@ function setup() {
         //    zoomClamp({}, textLabel(string, 0, 0, 40, -20)));
         return textLabel(string, pos-40, -80, pos+40, -100);
     }
+
+
+
+
+    // setup canvas
+    var canvas = document.getElementById("canvas");
+    var s = new Summon.Canvas(canvas);
+    s.setBGColor("#dde8ff");
 
     // draw an arrow with our function
     s.add(arrow());
@@ -67,6 +70,8 @@ function setup() {
 
     // center the "camera" so that all shapes are in view
     s.home();
+
+    // zoom out a little bit
     s.focusCenter();
     s.zoom(.8, .8);
     s.draw();
@@ -78,8 +83,20 @@ function setup() {
 </head>
 <body onload="setup();">
 
+<div class="topbar">
+<a href="./">summon.js examples</a>
+</div>
+
 <!-- main canvas element -->
 <canvas id="canvas" width="800" height="400"></canvas>
+
+<div class="explain">
+<p>
+Transforms (translate, rotate, flip, scale) can be used to alter the appearance
+of any containing elements.
+</p>
+<div>
+
 
 </body>
 </html>

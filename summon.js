@@ -405,6 +405,7 @@ Summon.Canvas = function (canvas)
 
     // models
     this.world = group();
+    this.bgcolor = "white";
 
 
     function getWindowMousePoint(e)
@@ -555,7 +556,10 @@ Summon.Canvas = function (canvas)
     // model methods
 
     this.clearDrawing = function() {
-	c.clearRect(0, 0, canvas.width, canvas.height);
+        c.save();
+        c.fillStyle = this.bgcolor;
+	c.fillRect(0, 0, canvas.width, canvas.height);
+        c.restore();
     };
 
     this.add = function(grp) {
@@ -572,6 +576,10 @@ Summon.Canvas = function (canvas)
         that.world = group();
     };
 
+    this.setBGColor = function(color) {
+        this.bgcolor = color;
+    }
+
 
     //=====================================================================
     // drawing methods
@@ -582,7 +590,7 @@ Summon.Canvas = function (canvas)
 	c.save();
         c.translate(0, canvas.height);
         c.scale(1, -1);
-	Summon.drawElements(c, that.world, getCameraTransmat());
+	drawElements(c, that.world, getCameraTransmat());
 	c.restore();
     };
 
@@ -613,7 +621,7 @@ Summon.Canvas = function (canvas)
 
     this.focusCenter = function()
     {
-        that.focusWindow(canvas.width/2, canvas.height/2);
+        this.focusWindow(canvas.width/2, canvas.height/2);
     };
 
     this.focusWindow = function(x, y) {
@@ -661,8 +669,18 @@ Summon.Canvas = function (canvas)
         return [canvas.width, canvas.height];
     };
 
+    
+    // sets the current view to the specified bounding box
+    //    
+    //    mode -- specifies the zoom using one of the following
+    //            "one2one" sets zoom to 1:1
+    //            "keep"    keeps zoom at current ratio
+    //            "exact"   sets zoom exactly as bounding box implies
     this.setVisible = function(x1, y1, x2, y2, mode)
     {
+        if (typeof mode == "undefined")
+            mode = "one2one";
+
         // ensure coordinates are properly ordered
         if (x1 > x2) {
             var t = x1; x1 = x2; x2 = t;
@@ -681,21 +699,64 @@ Summon.Canvas = function (canvas)
         // do nothing if window has zero width or height
         if (winsize[0] == 0 || winsize[1] == 0)
             return;
-        
-        // set visible according to mode
-        //if (mode == "exact") {
-        camera.focus = [x1, y1];
-        camera.zoom = [winsize[0] / (x2 - x1), winsize[1] / (y2 - y1)];
-        camera.trans = [-x1, -y1];
-        this.draw();
-    };
 
-    // TODO: make aspect ratio preserving option
-    this.home = function() {
+        // set visible according to mode
+        if (mode == "one2one") {
+            camera.zoom = [1, 1];
+            this.setVisible(x1, y1, x2, y2, "keep");
+            
+        } else if (mode == "keep") {
+            var zoomx = camera.zoom[0];
+            var zoomy = camera.zoom[1];
+            var zoomratio = zoomx / zoomy;
+            var worldw = x2 - x1;
+            var worldh = y2 - y1;
+            var vieww = worldw * zoomx;
+            var viewh = worldh * zoomy;
+            
+            // determine which dimension is tight
+            var offset, zoomx2, zoomy2;
+            if (vieww / viewh < winsize[0] / winsize[1]) {
+                // height is tight
+                zoomy2 = winsize[1] / worldh;
+                zoomx2 = zoomy2 * zoomratio;
+                
+                var worldw2 = winsize[0] / zoomx2;
+                offset = [- (worldw2 - worldw) / 2.0, 0.0];
+            } else {
+                // width is tight
+                zoomx2 = winsize[0] / worldw;
+                zoomy2 = zoomx2 / zoomratio;
+                
+                var worldh2 = winsize[1] / zoomy2;
+                offset = [0.0, - (worldh2 - worldh) / 2.0];
+            }
+            
+            camera.focus = [x1 + offset[0], y1 + offset[1]];
+            camera.zoom = [zoomx2, zoomy2];
+            camera.trans = [-x1 - offset[0], -y1 - offset[1]];
+            this.draw();
+            
+        } else if (mode == "exact") {
+            camera.focus = [x1, y1];
+            camera.zoom = [winsize[0] / (x2 - x1), winsize[1] / (y2 - y1)];
+            camera.trans = [-x1, -y1];
+            this.draw();
+
+        } else {
+            throw "unknown zoom mode '" + mode + "'";
+        }
+    };
+    
+    this.home = function(mode) {
+        if (typeof mode == "undefined")
+            mode = "one2one";
+
         var transmat = identityMatrix;
         var boundbox = [Infinity, Infinity, -Infinity, -Infinity];
         this.world.findBounding(transmat, camera, boundbox);
-        this.setVisible(boundbox[0], boundbox[1], boundbox[2], boundbox[3]);
+        this.setVisible(boundbox[0], boundbox[1], boundbox[2], boundbox[3],
+                        mode);
         this.draw();
     };
 
@@ -774,7 +835,7 @@ Summon.Canvas = function (canvas)
 
 
 // Draws group of elements 'grp' on a context 'c'
-Summon.drawElements = function drawElements(c, grp, transmat)
+var drawElements = Summon.drawElements = function (c, grp, transmat)
 {
 
     var elm = grp.kind;
