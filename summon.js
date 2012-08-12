@@ -397,7 +397,11 @@ Summon.Canvas = function (canvas)
     var bindings = {keydown: {}, 
                     keyup: {},
                     mouse: {}};
+    var loopid = null;
+    var loopInterval = 50;
+    var drawQueued = false;
     canvas.summonCanvas = this;
+
 
     // mouse info
     var mouseState = "up";
@@ -406,7 +410,36 @@ Summon.Canvas = function (canvas)
     // models
     this.world = group();
     this.bgcolor = "white";
+    
 
+    //====================================================================
+    // main loop
+
+    function startLoop() {
+        if (!loopid)
+            loopid = setInterval(loop, loopInterval);
+    }
+
+    function loop() {
+        if (drawQueued) {
+            that.draw();
+            drawQueued = false;
+        }
+    }
+
+    function stopLoop() {
+        if (loopid) {
+            clearInterval(loopid);
+            loopid = null;
+        }
+    }
+
+    this.queueDraw = function() {
+        drawQueued = true;
+    }
+    
+    //====================================================================
+    // mouse events
 
     function getWindowMousePoint(e)
     {
@@ -431,7 +464,7 @@ Summon.Canvas = function (canvas)
 	    camera.trans[0] += dx;
 	    camera.trans[1] += dy;
             mousePt = pt;
-	    that.draw();
+            that.queueDraw();
 	} else {
             mousePt = pt;
         }   
@@ -448,25 +481,6 @@ Summon.Canvas = function (canvas)
 	mouseState = "up";
         var pt = getScreenMousePoint(e);
         that.hotspotClick(pt[0], pt[1]);
-    }
-
-
-    this.hotspotClick = function(x, y)
-    {
-        var pt = screenToWorld(x, y);
-        function walk(grp) {
-            if (grp.kind == "hotspot") {
-                if (grp.isCollide(pt[0], pt[1], camera))
-                    grp.func();
-            }
-
-            if (!grp.children)
-                alert(grp.kind);
-            
-            for (var i=0; i<grp.children.length; i++)
-                walk(grp.children[i]);
-        }
-        walk(this.world);
     }
 
 
@@ -502,6 +516,26 @@ Summon.Canvas = function (canvas)
         if (func) 
             return func();
     }
+
+
+    this.hotspotClick = function(x, y)
+    {
+        var pt = screenToWorld(x, y);
+        function walk(grp) {
+            if (grp.kind == "hotspot") {
+                if (grp.isCollide(pt[0], pt[1], camera))
+                    grp.func();
+            }
+
+            if (!grp.children)
+                alert(grp.kind);
+            
+            for (var i=0; i<grp.children.length; i++)
+                walk(grp.children[i]);
+        }
+        walk(this.world);
+    }
+
     
     //======================================================================
     // coordinate conversions
@@ -533,34 +567,10 @@ Summon.Canvas = function (canvas)
 	transmat = multTransMatrix(transmat, -camera.focus[0], -camera.focus[1]);
 	return transmat;
     }
-
-
-    //======================================================================
-    // drawing methods
-
-    function transformWorld()
-    {
-	c.lineWidth = 1 / Math.max(camera.zoom[0], camera.zoom[1]);
-
-	// perform translation
-	c.translate(camera.trans[0], camera.trans[1]);
-	
-	// perform zoom with respect to focus point
-	c.translate(camera.focus[0], camera.focus[1]);
-	c.scale(camera.zoom[0], camera.zoom[1]);
-	c.translate(-camera.focus[0], -camera.focus[1]);
-    }
-
-
+    
+    
     //======================================================================
     // model methods
-
-    this.clearDrawing = function() {
-        c.save();
-        c.fillStyle = this.bgcolor;
-	c.fillRect(0, 0, canvas.width, canvas.height);
-        c.restore();
-    };
 
     this.add = function(grp) {
 	that.world.push(grp);
@@ -594,6 +604,15 @@ Summon.Canvas = function (canvas)
 	c.restore();
     };
 
+
+    this.clearDrawing = function() {
+        c.save();
+        c.fillStyle = this.bgcolor;
+	c.fillRect(0, 0, canvas.width, canvas.height);
+        c.restore();
+    };
+    
+    
     //=======================
     // camera methods
 
@@ -761,6 +780,9 @@ Summon.Canvas = function (canvas)
     };
 
 
+    //======================================================================
+    // binding methods
+
     function parseKeyMod(input) {
         var mod = "";
         if (input.indexOf("shift") != -1) 
@@ -829,7 +851,10 @@ Summon.Canvas = function (canvas)
     // default bindings
     this.setDefaultBindings();
 
+    // default context style
     c.strokeStyle = c.fillStyle = "black";
+
+    startLoop();
 };
 
 
