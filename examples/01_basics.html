@@ -1,0 +1,53 @@
+<html>
+<head>
+
+<link type="text/css" rel="stylesheet" href="style.css">
+
+<script type="text/javascript" src="../summon.js"></script>
+<script type="text/javascript"><!--
+
+function setup() {
+
+    // setup canvas
+    var canvas = document.getElementById("canvas");
+    var s = new Summon.Canvas(canvas);
+
+    // add a line from (0,0) to (30,40)
+    s.add(lines(0,0, 30,40));
+
+    // add two blue quadrilaterals inside a group
+    s.add(group(style({fill: "#00f"}), 
+          quads(50,0, 50,70, 60,70, 60,0),
+          quads(65,0, 65,70, 75,70, 75,0)));
+
+    // add a multi-colored quad, where each vertex has it own color
+    s.add(group(style({fill: "red", stroke: "black"}),
+                quads(100, 0,
+                      100, 70,
+                      140, 60,
+                      140, 0)));
+
+    // add some text below everything else
+    s.add(textLabel("Hello, world!",    // text to appear
+          0, -10, 140, -100));          // bounding box of text
+
+    // center the "camera" so that all shapes are in view
+    s.home();
+    s.focusCenter();
+    s.zoom(.8, .8);
+    s.draw();
+
+}
+
+--></script>
+
+</head>
+<body onload="setup();">
+
+<!-- main canvas element -->
+<canvas id="canvas" width="800" height="400"></canvas>
+
+</body>
+</html>
+
+

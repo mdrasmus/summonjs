@@ -1,0 +1,87 @@
+<html>
+<head>
+
+<link type="text/css" rel="stylesheet" href="style.css">
+
+<script type="text/javascript" src="../summon.js"></script>
+<script type="text/javascript"><!--
+
+function setup() {
+
+    // setup canvas
+    var canvas = document.getElementById("canvas");
+    var s = new Summon.Canvas(canvas);
+
+
+    // a function for drawing a commonly used shape
+    function arrow() {
+    
+        return group(
+            style({fill: "red"}),
+            quads(0, 0,             // right fin
+                  40, -40,
+                  40, -80,
+                  0, -40),
+            style({fill: "blue"}),
+            quads(0, 0,             // left fin
+                  -40, -40,
+                  -40, -80,
+                  0, -40),
+            style({stoke: "white"}),
+            lines(0, 0, 0, 100));    // shaft
+    }
+
+    // a function for writing text at particular position
+    function label(string, pos) {
+        //return translate(pos-40, -80,
+        //    zoomClamp({}, textLabel(string, 0, 0, 40, -20)));
+        return textLabel(string, pos-40, -80, pos+40, -100);
+    }
+
+    // draw an arrow with our function
+    s.add(arrow());
+    s.add(label("arrow", 0));
+
+    // draw the arrow again, 
+    // except translated to the right by 100
+    s.add(translate(100, 0, arrow()));
+    s.add(label("translated arrow", 100));
+
+
+    // draw another arrow that is translated and then rotated 
+    s.add(translate(200, 0, rotate(40, arrow())));
+    s.add(label("rotated arrow", 200));
+
+    // draw another arrow that is translated and then 
+    // fliped over the line (0, 100) 
+    s.add(translate(350, 0, 
+          flip(0, 100, arrow()),
+          label("fliped arrow", 0)));
+    // notice how the label is now also in the translation
+
+    // draw another arrow that is translated and then scaled by a 1/3
+    s.add(translate(450, 0, 
+                    scale(.3, .3, arrow()),
+                    label("scaled arrow", 0)));
+
+
+    // center the "camera" so that all shapes are in view
+    s.home();
+    s.focusCenter();
+    s.zoom(.8, .8);
+    s.draw();
+
+}
+
+--></script>
+
+</head>
+<body onload="setup();">
+
+<!-- main canvas element -->
+<canvas id="canvas" width="800" height="400"></canvas>
+
+</body>
+</html>
+
+

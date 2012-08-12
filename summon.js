@@ -1,10 +1,39 @@
 
-
-// include
-//document.write('<script language="JavaScript" src="canvastext.js"></script>');
+var Summon = (function (window, Summon) {
 
 
 //=============================================================================
+// misc
+
+function min(a, b) {
+    if (typeof b == "undefined") {
+        var low = a[0];
+        for (var i=1; i<a.length; i++) {
+            if (a[i] < low)
+                low = a[i];
+        }
+        return low;
+    } else {
+        return (a < b ? a : b);
+    }
+}
+
+
+function max(a, b) {
+    if (typeof b == "undefined") {
+        var top = a[0];
+        for (var i=1; i<a.length; i++) {
+            if (a[i] > top)
+                top = a[i];
+        }
+        return top;
+    } else {
+        return (a > b ? a : b);
+    }
+}
+
+//=============================================================================
+// events
 
 function addEventListener(obj, event, event2, callback)
 {
@@ -17,7 +46,7 @@ function addEventListener(obj, event, event2, callback)
 
 
 // Event handler for mouse wheel event.
-function calcMouseWheelDelta(event){
+function calcMouseWheelDelta(event) {
     var delta = 0;
     if (!event) /* For IE. */
         event = window.event;
@@ -36,15 +65,14 @@ function calcMouseWheelDelta(event){
 
 
 //=============================================================================
-// graphics primatives
+// Model classes
 
 
-
-function Group(children)
+var Group = Summon.Group = function (children)
 {
     this.parent = null;
     this.children = children;
-}
+};
 Group.prototype.kind = "group";
 
 Group.prototype.push = function push(x) {
@@ -89,17 +117,27 @@ Group.prototype.getTransmat = function(camera)
 };
 
 
-function Transform()
+var Transform = Summon.Transform = function ()
 {
-}
+};
 Transform.prototype = new Group;
 Transform.prototype.kind = "transform";
 Transform.prototype.getMatrix = function()
 {
     return identityMatrix;
+};
+Transform.prototype.findBounding = function(transmat, camera, boundbox) 
+{
+    // boundbox = [left, bottom, right, top];
+    var transmat2 = multMatrix(transmat, this.getMatrix());
+
+    for (var i=0; i<this.children.length; i++) {
+        var child = this.children[i];
+        child.findBounding(transmat2, camera, boundbox);
+    }
 }
 
-function Translate(x, y, children)
+var Translate = Summon.Translate = function (x, y, children)
 {
     this.parent = null;
     this.children = children;
@@ -110,23 +148,23 @@ Translate.prototype.kind = "translate";
 Translate.prototype.getMatrix = function()
 {
     return makeTransMatrix(this.data[0], this.data[1]);
-}
+};
 
 
-function Scale(x, y, children)
+var Scale = Summon.Scale = function (x, y, children)
 {
     this.parent = null;
     this.children = children;
     this.data = [x, y];    
-}
+};
 Scale.prototype = new Transform;
 Scale.prototype.kind = "scale";
 Scale.prototype.getMatrix = function()
 {
     return makeScaleMatrix(this.data[0], this.data[1]);
-}
+};
 
-function Rotate(r, children)
+var Rotate = Summon.Rotate = function (r, children)
 {
     this.parent = null;
     this.children = children;
@@ -139,7 +177,39 @@ Rotate.prototype.getMatrix = function()
     return makeRotateMatrix(this.data[0]);
 }
 
-function Graphic(kind, data)
+var Flip = Summon.Flip = function (x, y, children)
+{
+    this.parent = null;
+    this.children = children;
+
+    var mag = Math.sqrt(x*x + y*y);
+    this.data = [x / mag, y / mag];
+}
+Flip.prototype = new Transform;
+Flip.prototype.kind = "flip";
+Flip.prototype.getMatrix = function()
+{
+    var angle = Math.acos(this.data[0]) / Math.PI * 180;
+    var transmat = makeRotateMatrix(-angle);
+    transmat = multScaleMatrix(transmat, 1, -1);
+    return multRotateMatrix(transmat, angle);
+}
+
+var ZoomClamp = Summon.ZoomClamp = function (options, children)
+{
+    this.parent = null;
+    this.children = children;
+    this.data = options;
+}
+ZoomClamp.prototype = new Transform;
+ZoomClamp.prototype.kind = "zoomClamp";
+ZoomClamp.prototype.getMatrix = function()
+{
+    return identityMatrix;
+}
+
+
+var Graphic = Summon.Graphic = function (kind, data)
 {
     this.kind = kind;
     this.parent = null;
@@ -166,24 +236,32 @@ Graphic.prototype.findBounding = function findBounding(
 };
 
 
-function TextLabel(text, x1, y1, x2, y2, options)
+var TextLabel = Summon.TextLabel = function (text, x1, y1, x2, y2, options)
 {
+    // normalize coordinates
+    if (x1 > x2) {
+        var tmp = x1; x1 = x2; x2 = tmp;
+    }
+    if (y1 > y2) {
+        var tmp = y1; y1 = y2; y2 = tmp;
+    }
+    
     this.parent = null;
     this.data = [x1, y1, x2, y2];
     this.text = text;
     this.options = options;
-}
+};
 TextLabel.prototype = new Graphic;
 TextLabel.prototype.kind = "textLabel";
 
 
 
-function Hotspot(x1, y1, x2, y2, func)
+var Hotspot = Summon.Hotspot = function (x1, y1, x2, y2, func)
 {
     this.data = [];
     this.coords = [x1, y1, x2, y2];
     this.func = func;
-}
+};
 Hotspot.prototype = new Graphic;
 Hotspot.prototype.kind = "hotspot";
 Hotspot.prototype.isCollide = function(x, y, camera)
@@ -195,45 +273,48 @@ Hotspot.prototype.isCollide = function(x, y, camera)
     var c = [v[0], v[3]];
     var d = [v[2], v[1]];
     return inQuad(a, c, b, d, [x, y]);
-}
+};
 
 
 //=============================================================================
-// model functions
+// public model functions
 
 function group()
 {
     return new Group(Array.prototype.slice.call(arguments));
 }
-
+window.group = Summon.group = group;
 
 // graphic functions
-
 function lines()
 {
     return new Graphic("lines", Array.prototype.slice.call(arguments));
 }
+window.lines = Summon.lines = lines;
 
 function lineStrip()
 {
     return new Graphic("lineStrip", Array.prototype.slice.call(arguments));
 }
+window.lineStrip = Summon.lineStrip = lineStrip;
 
 function triangles()
 {
     return new Graphic("triangles", Array.prototype.slice.call(arguments));
 }
+window.triangles = Summon.triangles = triangles;
 
 function quads()
 {
     return new Graphic("quads", Array.prototype.slice.call(arguments));
 }
+window.quads = Summon.quads = quads;
 
 function polygon()
 {
     return new Graphic("polygon", Array.prototype.slice.call(arguments));    
 }
-
+window.polygon = Summon.polygon = polygon;
 
 function textLabel(text, x1, y1, x2, y2, options)
 {
@@ -241,6 +322,7 @@ function textLabel(text, x1, y1, x2, y2, options)
         options = {};  // default options
     return new TextLabel(text, x1, y1, x2, y2, options);
 }
+window.textLabel = Summon.textLabel = textLabel;
 
 function style(options)
 {
@@ -248,61 +330,66 @@ function style(options)
     style.options = options;
     return style;
 }
-
-
-
-// transform functions
-
-function translate(x, y)
-{
-    return new Translate(x, y, Array.prototype.slice.call(arguments, 2, arguments.length));
-}
-
-function scale(x, y)
-{
-    return new Scale(x, y, Array.prototype.slice.call(arguments, 2, arguments.length));
-}
-
-function rotate(r)
-{
-    return new Rotate(r, Array.prototype.slice.call(arguments, 1, arguments.length));
-}
-
-
+window.style = Summon.style = style;
 
 function hotspot(x1, y1, x2, y2, func)
 {
     return new Hotspot(x1, y1, x2, y2, func);
 }
+window.hotspot = Summon.hotspot = hotspot;
 
+// transform functions
+function translate(x, y)
+{
+    return new Translate(x, y, Array.prototype.slice.call(arguments, 2));
+}
+window.translate = Summon.translate = translate;
 
+function scale(x, y)
+{
+    return new Scale(x, y, Array.prototype.slice.call(arguments, 2));
+}
+window.scale = Summon.scale = scale;
 
+function rotate(r)
+{
+    return new Rotate(r, Array.prototype.slice.call(arguments, 1));
+}
+window.rotate = Summon.rotate = rotate;
+
+function flip(x, y)
+{
+    return new Flip(x, y, Array.prototype.slice.call(arguments, 2));
+}
+window.flip = Summon.flip = flip;
+
+function zoomClamp(options)
+{
+    return new ZoomClamp(options, Array.prototype.slice.call(arguments, 1, arguments.length));
+}
+window.zoomClamp = Summon.zoomClamp = zoomClamp;
 
 
 //=============================================================================
-
-
-// create the Summon namespace
-var Summon = Summon || {
-
+// Canvas and Camera classes
 
 // keycodes
-    KEY_RIGHT: 39,
-    KEY_LEFT: 37,
-    KEY_UP: 38,
-    KEY_DOWN: 40,
+Summon.KEY_RIGHT = 39;
+Summon.KEY_LEFT = 37;
+Summon.KEY_UP = 38;
+Summon.KEY_DOWN = 40;
 
 
 
-Camera: function Camera()
+Summon.Camera = function ()
 {
     this.trans = [0, 0];
     this.zoom = [1, 1];
     this.focus = [0, 0];
-},
+};
 
 
-Canvas: function Canvas(canvas)
+Summon.Canvas = function (canvas)
 {
     var that = this;
     var c = canvas.getContext("2d");
@@ -310,6 +397,7 @@ Canvas: function Canvas(canvas)
     var bindings = {keydown: {}, 
                     keyup: {},
                     mouse: {}};
+    canvas.summonCanvas = this;
 
     // mouse info
     var mouseState = "up";
@@ -321,16 +409,17 @@ Canvas: function Canvas(canvas)
 
     function getWindowMousePoint(e)
     {
-        return [e.clientX - canvas.offsetLeft,
-                e.clientY - canvas.offsetTop];
+        return [e.pageX - canvas.offsetLeft,
+                e.pageY - canvas.offsetTop];
+
     }
 
     function getScreenMousePoint(e)
     {
-        return [e.clientX - canvas.offsetLeft,
-                canvas.height - e.clientY + canvas.offsetTop];
+        return [e.pageX - canvas.offsetLeft,
+                canvas.height - e.pageY + canvas.offsetTop];
     }
-
+    
     function mouseMove(e)
     {
         var pt = getScreenMousePoint(e);
@@ -601,7 +690,7 @@ Canvas: function Canvas(canvas)
         this.draw();
     };
 
-
+    // TODO: make aspect ratio preserving option
     this.home = function() {
         var transmat = identityMatrix;
         var boundbox = [Infinity, Infinity, -Infinity, -Infinity];
@@ -680,12 +769,12 @@ Canvas: function Canvas(canvas)
     this.setDefaultBindings();
 
     c.strokeStyle = c.fillStyle = "black";
-},
+};
 
 
 
 // Draws group of elements 'grp' on a context 'c'
-drawElements: function drawElements(c, grp, transmat)
+Summon.drawElements = function drawElements(c, grp, transmat)
 {
 
     var elm = grp.kind;
@@ -811,14 +900,12 @@ drawElements: function drawElements(c, grp, transmat)
     } else if (elm == "translate") {
         c.save();
 	var transmat2 = multTransMatrix(transmat, grp.data[0], grp.data[1]);
-        //c.translate(grp.data[0], grp.data[1]);
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
         c.restore();
 
     } else if (elm == "rotate") {
         c.save();
-        //c.rotate(grp.data[0] * Math.PI / 180);
         var transmat2 = multRotateMatrix(transmat, grp.data[0]);
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
@@ -827,250 +914,30 @@ drawElements: function drawElements(c, grp, transmat)
     } else if (elm == "scale") {
         c.save();
 	var transmat2 = multScaleMatrix(transmat, grp.data[0], grp.data[1]);
-        //c.scale(grp.data[0], grp.data[1]);
-	//c.lineWidth /= Math.min(grp.data[0], grp.data[1]);
-	
         for (var i=0; i<grp.children.length; i++)
             drawElements(c, grp.children[i], transmat2);
         c.restore();
 
-
+    } else if (elm == "flip") {
+        c.save();
+        var angle = Math.acos(grp.data[0]) / Math.PI * 180;
+        var transmat2 = multRotateMatrix(transmat, -angle);
+        transmat2 = multScaleMatrix(transmat2, 1, -1);
+        transmat2 = multRotateMatrix(transmat2, angle);
+        for (var i=0; i<grp.children.length; i++)
+            drawElements(c, grp.children[i], transmat2);
+        c.restore();
+        
+    } else if (elm == "zoomClamp") {
+        c.save();
+        var zoom = getMatrixZoom(transmat);
+	var transmat2 = multScaleMatrix(transmat, 1/zoom[0], 1/zoom[1]);
+        for (var i=0; i<grp.children.length; i++)
+            drawElements(c, grp.children[i], transmat2);
+        c.restore();        
     }
-},
-
-
-
 
 };
-
-
-/*
-
-{
-
-    var mouseMove = function(e)
-    {
-	if (mouseState == "down") {
-            x = e.clientX;
-            y = e.clientY;
-            x -= canvas.offsetLeft;
-            y -= canvas.offsetTop;
-            c.lineTo(x, y);
-            c.stroke();
-            c.moveTo(x, y);
-	}
-    }
-
-    var mouseDown = function(e)
-    {
-	mouseState = "down";
-	c.beginPath();
-	c.moveTo(e.clientX, e.clientY);
-    }
-
-    var mouseUp = function(e)
-    {
-	mouseState = "up";
-	c.stroke();
-	c.closePath();
-    }
-
-
-}
-
-*/
-
-
-
-//=============================================================================
-// transforms
-
-
-
-
-function makeTransMatrix(x, y)
-{
-    return [1, 0, x,
-	    0, 1, y,
-	    0, 0, 1];
-}
-
-function makeRotateMatrix(r)
-{
-    var s = Math.sin(r * (Math.PI/180.0));
-    var c = Math.cos(r * (Math.PI/180.0));
-    return [c, -s, 0,
-	    s, c, 0,
-	    0, 0, 1];
-}
-
-function makeScaleMatrix(x, y)
-{
-    return [x, 0, 0,
-	    0, y, 0,
-	    0 ,0, 1];
-}
-
-
-function makeIdentityMatrix()
-{
-    return [1, 0, 0,
-	    0, 1, 0,
-	    0, 0, 1];
-}
-
-identityMatrix = [1, 0, 0,
-                  0, 1, 0,
-                  0, 0, 1];
-
-
-function multMatrix(a, b)
-{
-/*
-0 1 2
-3 4 5
-6 7 8
-*/
-    return [a[0]*b[0] + a[1]*b[3] + a[2]*b[6],
-	    a[0]*b[1] + a[1]*b[4] + a[2]*b[7],
-	    a[0]*b[2] + a[1]*b[5] + a[2]*b[8],
-
-	    a[3]*b[0] + a[4]*b[3] + a[5]*b[6],
-	    a[3]*b[1] + a[4]*b[4] + a[5]*b[7],
-	    a[3]*b[2] + a[4]*b[5] + a[5]*b[8],
-
-	    a[6]*b[0] + a[7]*b[3] + a[8]*b[6],
-	    a[6]*b[1] + a[7]*b[4] + a[8]*b[7],
-	    a[6]*b[2] + a[7]*b[5] + a[8]*b[8]];
-}
-
-
-function multTransMatrix(m, x, y)
-{
-/* 
-   0 1 2
-   3 4 5
-   6 7 8
-
-   0  1  2  3
-   4  5  6  7
-   8  9  10 11
-   12 13 14 15
-*/
-    return [m[0],
-	    m[1],
-	    m[0]*x + m[1]*y + m[2],
-
-	    m[3],
-	    m[4],
-	    m[3]*x + m[4]*y + m[5],
-
-	    m[6],
-	    m[7],
-	    m[6]*x + m[7]*y + m[8]];
-}
-
-
-function multRotateMatrix(m, r)
-{
-/* 
-   0 1 2
-   3 4 5
-   6 7 8
-*/
-
-    var s = Math.sin(r * (Math.PI/180.0));
-    var o = Math.cos(r * (Math.PI/180.0));
-    
-    return [
-        m[0] * o + m[1] * s,
-        m[1] * o - m[0] * s,
-        m[2],
-
-        m[3] * o + m[4] * s,
-        m[4] * o - m[3] * s,
-        m[5],
-
-        m[6] * o + m[7] * s,
-        m[7] * o - m[6] * s,
-        m[8]];
-}
-
-
-
-function multScaleMatrix(m, x, y)
-{
-/* 
-   0 1 2
-   3 4 5
-   6 7 8
-*/
-    return [m[0]*x, m[1]*y, m[2],
-	    m[3]*x, m[4]*y, m[5],
-	    m[6]*x, m[7]*y, m[8]];
-	    
-}
-
-
-function multVecMatrix(m, x, y)
-{
-/*
-0 1 2
-3 4 5
-6 7 8
-*/
-    return [x*m[0] + y*m[1] + m[2],
-	    x*m[3] + y*m[4] + m[5]];
-}
-
-
-function getMatrixZoom(m)
-{
-    return [Math.sqrt(m[0]*m[0] + m[3]*m[3]),
-            Math.sqrt(m[1]*m[1] + m[4]*m[4])];
-}
-
-
-function inLeftHalfspace(a, b, p)  
-{
-    // define left if at a and facing towards b
-     return (b[0]-a[0]) * (p[1]-a[1]) - (b[1]-a[1]) * (p[0]-a[0]) <= 0;
-}
-
-
-function inTriangle(a, b, c, pos)
-{
-    var clockwise = inLeftHalfspace(b, a, c);
-    if (clockwise)
-    {
-        return inLeftHalfspace(b, a, pos) && 
-               inLeftHalfspace(c, b, pos) && 
-               inLeftHalfspace(a, c, pos);
-    } else {
-        return inLeftHalfspace(a, b, pos) && 
-               inLeftHalfspace(b, c, pos) && 
-               inLeftHalfspace(c, a, pos);
-    }
-}
-
-
-function inQuad(a, b, c, d, pos)
-{
-    var clockwise = inLeftHalfspace(b, a, c);
-    if (clockwise)
-    {
-        return inLeftHalfspace(b, a, pos) && 
-               inLeftHalfspace(c, b, pos) && 
-               inLeftHalfspace(d, c, pos) &&
-               inLeftHalfspace(a, d, pos);
-    } else {
-        return inLeftHalfspace(a, b, pos) && 
-               inLeftHalfspace(b, c, pos) && 
-               inLeftHalfspace(c, d, pos) &&
-               inLeftHalfspace(d, a, pos);
-    }
-}
-
 
 
 
@@ -1083,9 +950,9 @@ function inQuad(a, b, c, d, pos)
 // He may keep some sort of up to date copy at 
 // http://www.federated.com/~jim/canvastext/
 //
-Summon.Text = { };
+Summon.Text = (function function (Text) {
 
-Summon.Text.letters = {
+    var letters = {
 	' ': { width: 16, points: [] },
 	'!': { width: 10, points: [[5,21],[5,7],[-1,-1],[5,2],[4,1],[5,0],[6,1],[5,2]] },
 	'"': { width: 16, points: [[4,21],[4,14],[-1,-1],[12,21],[12,14]] },
@@ -1098,7 +965,7 @@ Summon.Text.letters = {
 	')': { width: 14, points: [[3,25],[5,23],[7,20],[9,16],[10,11],[10,7],[9,2],[7,-2],[5,-5],[3,-7]] },
 	'*': { width: 16, points: [[8,21],[8,9],[-1,-1],[3,18],[13,12],[-1,-1],[13,18],[3,12]] },
 	'+': { width: 26, points: [[13,18],[13,0],[-1,-1],[4,9],[22,9]] },
-	',': { width: 10, points: [[6,1],[5,0],[4,1],[5,2],[6,1],[6,-1],[5,-3],[4,-4]] },
+        ',': { width: 10, points: [[6,1],[5,0],[4,1],[5,2],[6,1],[6,-1],[5,-3],[4,-4]] },
 	'-': { width: 26, points: [[4,9],[22,9]] },
 	'.': { width: 10, points: [[5,2],[4,1],[5,0],[6,1],[5,2]] },
 	'/': { width: 22, points: [[20,25],[2,-7]] },
@@ -1113,7 +980,7 @@ Summon.Text.letters = {
 	'8': { width: 20, points: [[8,21],[5,20],[4,18],[4,16],[5,14],[7,13],[11,12],[14,11],[16,9],[17,7],[17,4],[16,2],[15,1],[12,0],[8,0],[5,1],[4,2],[3,4],[3,7],[4,9],[6,11],[9,12],[13,13],[15,14],[16,16],[16,18],[15,20],[12,21],[8,21]] },
 	'9': { width: 20, points: [[16,14],[15,11],[13,9],[10,8],[9,8],[6,9],[4,11],[3,14],[3,15],[4,18],[6,20],[9,21],[10,21],[13,20],[15,18],[16,14],[16,9],[15,4],[13,1],[10,0],[8,0],[5,1],[4,3]] },
 	':': { width: 10, points: [[5,14],[4,13],[5,12],[6,13],[5,14],[-1,-1],[5,2],[4,1],[5,0],[6,1],[5,2]] },
-	',': { width: 10, points: [[5,14],[4,13],[5,12],[6,13],[5,14],[-1,-1],[6,1],[5,0],[4,1],[5,2],[6,1],[6,-1],[5,-3],[4,-4]] },
+	';': { width: 10, points: [[5,14],[4,13],[5,12],[6,13],[5,14],[-1,-1],[6,1],[5,0],[4,1],[5,2],[6,1],[6,-1],[5,-3],[4,-4]] },
 	'<': { width: 24, points: [[20,18],[4,9],[20,0]] },
 	'=': { width: 26, points: [[4,12],[22,12],[-1,-1],[4,6],[22,6]] },
 	'>': { width: 24, points: [[4,18],[20,9],[4,0]] },
@@ -1181,91 +1048,273 @@ Summon.Text.letters = {
 	'|': { width: 8, points: [[4,25],[4,-7]] },
 	'}': { width: 14, points: [[5,25],[7,24],[8,23],[9,21],[9,19],[8,17],[7,16],[6,14],[6,12],[8,10],[-1,-1],[7,24],[8,22],[8,20],[7,18],[6,17],[5,15],[5,13],[6,11],[10,9],[6,7],[5,5],[5,3],[6,1],[7,0],[8,-2],[8,-4],[7,-6],[-1,-1],[8,8],[6,6],[6,4],[7,2],[8,1],[9,-1],[9,-3],[8,-5],[7,-6],[5,-7]] },
 	'~': { width: 24, points: [[3,6],[3,8],[4,11],[6,12],[8,12],[10,11],[14,8],[16,7],[18,7],[20,8],[21,10],[-1,-1],[3,8],[4,10],[6,11],[8,11],[10,10],[14,7],[16,6],[18,6],[20,7],[21,10],[21,12]] }
-};
+    };
 
-Summon.Text.lineCap = 'butt';
+    var lineCap = 'butt';
 
-Summon.Text.letter = function(ch)
-{
-	return Summon.Text.letters[ch];
-}
+    function letter(ch)
+    {
+	return letters[ch];
+    };
 
-Summon.Text.ascent = function(font, size)
-{
+    function ascent(font, size)
+    {
 	return size;
-}
+    };
 
-Summon.Text.descent = function(font, size)
-{
+    function descent(font, size)
+    {
 	return 7.0*size/25.0;
-}
+    };
 
-Summon.Text.measure = function(font, size, str)
-{
+    function measure(font, size, str)
+    {
 	var total = 0;
 	var len = str.length;
 
 	for ( i = 0; i < len; i++) {
-		var c = Summon.Text.letter( str.charAt(i));
+		var c = letter( str.charAt(i));
 		if ( c) total += c.width * size / 25.0;
 	}
 	return total;
-}
+    };
 
-Summon.Text.draw = function(ctx, font, size, x, y, str, transmat)
-{
-    var total = 0;
-    var len = str.length;
-    var mag = size / 25.0;
-    if (!transmat)
-	transmat = identityMatrix;
+    function draw(ctx, font, size, x, y, str, transmat)
+    {
+        var total = 0;
+        var len = str.length;
+        var mag = size / 25.0;
+        if (!transmat)
+	    transmat = identityMatrix;
 
-    ctx.save();
-    ctx.lineCap = Summon.Text.lineCap;
+        ctx.save();
+        ctx.lineCap = lineCap;
 	
-    for (var i = 0; i < len; i++) {
-	var c = Summon.Text.letter(str.charAt(i));
-	if (!c) continue;
-
-	ctx.beginPath();
-        
-	var penUp = 1;
-	var needStroke = 0;
-	for (var j = 0; j < c.points.length; j++) {
-	    var a = c.points[j];
-	    if (a[0] == -1 && a[1] == -1) {
-		penUp = 1;
-		continue;
+        for (var i = 0; i < len; i++) {
+	    var c = letter(str.charAt(i));
+	    if (!c) continue;
+            
+	    ctx.beginPath();
+            
+	    var penUp = 1;
+	    var needStroke = 0;
+	    for (var j = 0; j < c.points.length; j++) {
+	        var a = c.points[j];
+	        if (a[0] == -1 && a[1] == -1) {
+		    penUp = 1;
+		    continue;
+	        }
+                a = multVecMatrix(transmat, x + a[0]*mag, y - a[1]*mag);
+	        if (penUp) {
+		    ctx.moveTo(a[0], a[1]);
+		    penUp = false;
+	        } else {
+		    ctx.lineTo(a[0], a[1]);
+	        }
 	    }
-            a = multVecMatrix(transmat, x + a[0]*mag, y - a[1]*mag);
-	    if (penUp) {
-		ctx.moveTo(a[0], a[1]);
-		penUp = false;
-	    } else {
-		ctx.lineTo(a[0], a[1]);
-	    }
-	}
-	ctx.stroke();
-	x += c.width*mag;
-    }
-    ctx.restore();
-    return total;
-}
+	    ctx.stroke();
+	    x += c.width*mag;
+        }
+        ctx.restore();
+        return total;
+    };
 
-Summon.Text.enable = function( ctx)
+    // install methods in drawing context
+    Text.enable = function(ctx)
+    {
+        ctx.drawText = function(font, size, x, y, text, transmat) { 
+            return draw(ctx, font, size, x, y, text, transmat); 
+        };
+        ctx.measureText = function(font, size, text) {
+            return measure(font, size, text); 
+        };
+        ctx.fontAscent = function(font, size) {
+            return ascent(font, size);
+        };
+        ctx.fontDescent = function(font, size) {
+            return descent(font, size);
+        };
+        ctx.drawTextRight = function(font, size, x, y, text) { 
+	    var w = measure(font, size, text);
+	    return draw(ctx, font, size, x-w, y, text); 
+        };
+        ctx.drawTextCenter = function(font, size, x, y, text) { 
+	    var w = measure(font, size, text);
+	    return draw(ctx, font, size, x-w/2, y, text); 
+        };
+    };
+
+    return Text;
+})(Summon.Text || {});
+
+
+
+//=============================================================================
+// transforms
+
+
+function makeTransMatrix(x, y)
 {
-    ctx.drawText = function(font,size,x,y,text,transmat) { return Summon.Text.draw( ctx, font,size,x,y,text,transmat); };
-	ctx.measureText = function(font,size,text) { return Summon.Text.measure( font,size,text); };
-	ctx.fontAscent = function(font,size) { return Summon.Text.ascent(font,size); }
-	ctx.fontDescent = function(font,size) { return Summon.Text.descent(font,size); }
-
-	ctx.drawTextRight = function(font,size,x,y,text) { 
-		var w = Summon.Text.measure(font,size,text);
-		return Summon.Text.draw( ctx, font,size,x-w,y,text); 
-	};
-	ctx.drawTextCenter = function(font,size,x,y,text) { 
-		var w = Summon.Text.measure(font,size,text);
-		return Summon.Text.draw( ctx, font,size,x-w/2,y,text); 
-	};
+    return [1, 0, x,
+	    0, 1, y,
+	    0, 0, 1];
 }
+
+function makeRotateMatrix(r)
+{
+    var s = Math.sin(r * (Math.PI/180.0));
+    var c = Math.cos(r * (Math.PI/180.0));
+    return [c, -s, 0,
+	    s, c, 0,
+	    0, 0, 1];
+}
+
+function makeScaleMatrix(x, y)
+{
+    return [x, 0, 0,
+	    0, y, 0,
+	    0 ,0, 1];
+}
+
+
+function makeIdentityMatrix()
+{
+    return [1, 0, 0,
+	    0, 1, 0,
+	    0, 0, 1];
+}
+
+var identityMatrix = [1, 0, 0,
+                      0, 1, 0,
+                      0, 0, 1];
+
+
+function multMatrix(a, b)
+{
+    return [a[0]*b[0] + a[1]*b[3] + a[2]*b[6],
+	    a[0]*b[1] + a[1]*b[4] + a[2]*b[7],
+	    a[0]*b[2] + a[1]*b[5] + a[2]*b[8],
+
+	    a[3]*b[0] + a[4]*b[3] + a[5]*b[6],
+	    a[3]*b[1] + a[4]*b[4] + a[5]*b[7],
+	    a[3]*b[2] + a[4]*b[5] + a[5]*b[8],
+
+	    a[6]*b[0] + a[7]*b[3] + a[8]*b[6],
+	    a[6]*b[1] + a[7]*b[4] + a[8]*b[7],
+	    a[6]*b[2] + a[7]*b[5] + a[8]*b[8]];
+}
+
+
+function multTransMatrix(m, x, y)
+{
+    return [m[0],
+	    m[1],
+	    m[0]*x + m[1]*y + m[2],
+
+	    m[3],
+	    m[4],
+	    m[3]*x + m[4]*y + m[5],
+
+	    m[6],
+	    m[7],
+	    m[6]*x + m[7]*y + m[8]];
+}
+
+
+function multRotateMatrix(m, r)
+{
+    var s = Math.sin(r * (Math.PI/180.0));
+    var o = Math.cos(r * (Math.PI/180.0));
+    
+    return [
+        m[0] * o + m[1] * s,
+        m[1] * o - m[0] * s,
+        m[2],
+
+        m[3] * o + m[4] * s,
+        m[4] * o - m[3] * s,
+        m[5],
+
+        m[6] * o + m[7] * s,
+        m[7] * o - m[6] * s,
+        m[8]];
+}
+
+
+
+function multScaleMatrix(m, x, y)
+{
+    return [m[0]*x, m[1]*y, m[2],
+	    m[3]*x, m[4]*y, m[5],
+	    m[6]*x, m[7]*y, m[8]];
+	    
+}
+
+/* 
+code for FLIP
+  double angle = acos(trans->GetParam1()) / M_PI * 180;
+  glRotated(-angle, 0, 0, 1);
+  glScaled(1.0, -1.0, 0.0);
+  glRotated(angle, 0, 0, 1);
+*/
+
+function multVecMatrix(m, x, y)
+{
+    return [x*m[0] + y*m[1] + m[2],
+	    x*m[3] + y*m[4] + m[5]];
+}
+
+
+function getMatrixZoom(m)
+{
+    return [Math.sqrt(m[0]*m[0] + m[3]*m[3]),
+            Math.sqrt(m[1]*m[1] + m[4]*m[4])];
+}
+
+
+function inLeftHalfspace(a, b, p)  
+{
+    // define left if at a and facing towards b
+     return (b[0]-a[0]) * (p[1]-a[1]) - (b[1]-a[1]) * (p[0]-a[0]) <= 0;
+}
+
+
+function inTriangle(a, b, c, pos)
+{
+    var clockwise = inLeftHalfspace(b, a, c);
+    if (clockwise)
+    {
+        return inLeftHalfspace(b, a, pos) && 
+               inLeftHalfspace(c, b, pos) && 
+               inLeftHalfspace(a, c, pos);
+    } else {
+        return inLeftHalfspace(a, b, pos) && 
+               inLeftHalfspace(b, c, pos) && 
+               inLeftHalfspace(c, a, pos);
+    }
+}
+
+
+function inQuad(a, b, c, d, pos)
+{
+    var clockwise = inLeftHalfspace(b, a, c);
+    if (clockwise)
+    {
+        return inLeftHalfspace(b, a, pos) && 
+               inLeftHalfspace(c, b, pos) && 
+               inLeftHalfspace(d, c, pos) &&
+               inLeftHalfspace(a, d, pos);
+    } else {
+        return inLeftHalfspace(a, b, pos) && 
+               inLeftHalfspace(b, c, pos) && 
+               inLeftHalfspace(c, d, pos) &&
+               inLeftHalfspace(d, a, pos);
+    }
+}
+
+
+return Summon;
+})(window, Summon || {});
+
+
 
