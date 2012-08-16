@@ -1,0 +1,206 @@
+<html>
+<head>
+
+<link type="text/css" rel="stylesheet" href="style.css">
+
+<script type="text/javascript" src="../summon.js"></script>
+<script type="text/javascript" src="newick.js"></script>
+<script type="text/javascript"><!--
+
+function min(a, b) {
+    return (a < b) ? a : b;
+}
+function max(a, b) {
+    return (a > b) ? a : b;
+}
+
+//=============================================================================
+// tree functions
+
+function getTreeAges(tree) {
+    var ages = {};
+
+    function walk(name) {
+        var node = tree.nodes[name];
+        
+        if (node.children.length == 0)
+            ages[name] = 0.0;
+        else {
+            var cname = node.children[0];
+            var child = tree.nodes[cname];
+            walk(cname);
+            ages[name] = ages[cname] + child.dist;
+        }
+    }
+    walk(tree.root);
+    
+    return ages;
+}
+
+
+function layoutTree(tree, options)
+{
+    // setup options
+    if (typeof options == "undefined")
+        options = {};
+    if (typeof options.x == "undefined")
+        options.x = 0;
+    if (typeof options.y == "undefined")
+        options.y = 0;
+    if (typeof options.yscale == "undefined")
+            options.yscale = 1.0;
+    var minlen = 0;
+    var maxlen = 1e12;
+        
+    var sizes = {};
+    var nodept = {}; // distance between node x and left bracket x
+    var layout = {};
+
+        
+    function walk(name) {    
+        var node = tree.nodes[name];
+        
+        // compute node sizes
+        sizes[name] = 0;
+        for (var i in node.children) {
+            var cname = node.children[i];
+            sizes[name] += walk(cname);
+        }
+        
+        if (node.children == 0) {
+            sizes[name] = 1;
+            nodept[name] = 1;
+        } else {
+            var n = node.children.length;
+            var top = nodept[node.children[0]];
+            var bot = (sizes[name] - sizes[node.children[n-1]]) + 
+                nodept[node.children[n-1]];
+            nodept[name] = (top + bot) / 2.0;
+        }
+        
+        return sizes[name];
+    }
+    walk(tree.root);
+        
+    // determine x, y coordinates
+    function walk2(name, x, y) {
+        var node = tree.nodes[name];
+        var ychildren = y + min(max(node.dist, minlen), maxlen) * 
+            options.yscale;
+        layout[name] = [x + nodept[name], ychildren];
+        
+        if (!node.children.length == 0) {
+            var xchild = x;
+            for (var i in node.children) {
+                var cname = node.children[i];
+                walk2(cname, xchild, ychildren);
+                xchild += sizes[cname];
+            }
+        }
+    }
+    walk2(tree.root, options.x, options.y);
+    
+    return layout;
+}
+
+
+
+function drawTree(tree, options)
+{
+    var ages = getTreeAges(tree);
+    if (typeof options == "undefined")
+        options = {};
+    if (typeof options.layout == "undefined")
+        layout = layoutTree(tree, {x:0, y:ages[tree.root], yscale: -1.0});
+
+    var g = group();
+    
+    function walk(name) {
+        var size = 1;
+        var node = tree.nodes[name];
+        
+        var x = layout[name][0];
+        var y = layout[name][1];
+        
+        if (node.parent) {            
+            var px = layout[node.parent][0];
+            var py = layout[node.parent][1];
+            g.push(lines(x, y, x, py));
+        }
+        
+        if (node.children.length > 0) {
+            var n = node.children.length;
+            var x1 = layout[node.children[0]][0];
+            var x2 = layout[node.children[n-1]][0];
+            
+            g.push(lines(x1, y, x2, y));
+            
+            for (var i in node.children)
+                walk(node.children[i]);
+        }
+    }
+    walk(tree.root);
+
+    // draw labels
+    var w = options.labelWidth || 10;
+    var h = 12;
+    for (var name in tree.nodes) {
+        if (tree.nodes[name].children.length == 0) {
+            var x = layout[name][0];
+            var y = layout[name][1];
+            g.push(translate(x, y, zoomClamp({},
+                    textLabel("" + name, -w/2, -h, w/2, 0))));
+        }
+    }
+
+    return g;
+}
+
+
+
+function setup() {
+
+
+    var tree = parseNewick("(((((((scer:7.061760,spar:7.061760):4.999680,smik:12.061440):5.970600,sbay:18.032040):52.682400,cgla:70.714260):7.220700,scas:77.934960):23.181480,((agos:78.553260,klac:78.553260):10.434960,kwal:88.988220):12.128400):78.883560,(((calb:41.275620,ctro:41.275980):29.632860,(cpar:52.323120,lelo:52.323120):18.585720):31.149540,((cgui:75.615840,dhan:75.615840):14.006880,clus:89.622720):12.435660):77.941620);");
+
+    
+    // setup canvas
+    var canvas = document.getElementById("canvas");
+    var s = new Summon.Canvas(canvas);
+
+    s.add(drawTree(tree, {labelWidth: 30}));
+    
+    // center the "camera" so that all shapes are in view
+    s.home("exact");
+
+    // zoom out a little bit
+    s.focusCenter();
+    s.zoom(2, .8);
+    s.draw();
+
+}
+
+--></script>
+
+</head>
+<body onload="setup();">
+
+<div class="topbar">
+<a href="./">summon.js examples</a>
+</div>
+
+<!-- main canvas element -->
+<canvas id="canvas" width="800" height="400"></canvas>
+
+
+<div class="explain">
+<p>
+This example shows some more advance drawing for phylogenetic trees.
+</p>
+<div>
+
+
+</body>
+</html>
+
+
