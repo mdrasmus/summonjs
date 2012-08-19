@@ -1,6 +1,9 @@
+
 summon.js -  A visualization prototyping library for javascript
 Copyright 2012 Matt Rasmussen 
+http://mattrasmus.com/summonjs
 rasmus@alum.mit.edu
+
 
 summon.js is a javascript library that provides rapid prototyping of
 2D visualizations. summon.js gives the user an "infinite white board"
@@ -18,4 +21,8 @@ the coordinate system most comfortable for the context.  This reduces
 effort in planning out pixel real estate.  In addition, text labels
 are also designed to resize themselves automatically based on the current 
 view or even clip if the text is not sufficiently large.
+
+Examples can be seen here:
+
+  http://mattrasmus.com/summonjs/pub/summonjs/examples
 
