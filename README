@@ -1,0 +1,21 @@
+summon.js -  A visualization prototyping library for javascript
+Copyright 2012 Matt Rasmussen 
+rasmus@alum.mit.edu
+
+summon.js is a javascript library that provides rapid prototyping of
+2D visualizations. summon.js gives the user an "infinite white board"
+on which to draw.  The user can then scroll and zoom through the
+drawing similar to Google Maps.  This very simple form of interaction
+actually covers a surprisingly wide variety of visualizations commonly
+encountered in scientific settings.  For example, this user interface
+works well for many visualizations in computational biology, such as
+phylogenetic trees, hierarchical clustering trees, sequence
+alignments, large heatmaps, and tracks within genome browsers.
+
+Another subtle feature is that zooming can also be done independently
+along horizontal and vertical axes.  Therefore, the user can plot in
+the coordinate system most comfortable for the context.  This reduces
+effort in planning out pixel real estate.  In addition, text labels
+are also designed to resize themselves automatically based on the current 
+view or even clip if the text is not sufficiently large.
+
