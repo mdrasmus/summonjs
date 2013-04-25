@@ -678,7 +678,7 @@ Summon.Canvas = function (canvas)
     this.doTranslate = function(x, y) {
         return function() {
             that.translate(x, y);
-            that.draw();
+            that.queueDraw();
         };
     };
 
@@ -691,7 +691,7 @@ Summon.Canvas = function (canvas)
                 that.focusWindow(mousePt[0], mousePt[1]);
             }
             that.zoom(x, y);
-            that.draw();
+            that.queueDraw();
         };
     };
 
@@ -706,7 +706,7 @@ Summon.Canvas = function (canvas)
                 that.zoom(z, 1);
             else if (y)
                 that.zoom(1, z);
-            that.draw();
+            that.queueDraw();
         }
     }
 
@@ -781,13 +781,13 @@ Summon.Canvas = function (canvas)
             camera.focus = [x1 + offset[0], y1 + offset[1]];
             camera.zoom = [zoomx2, zoomy2];
             camera.trans = [-x1 - offset[0], -y1 - offset[1]];
-            this.draw();
+            this.queueDraw();
             
         } else if (mode == "exact") {
             camera.focus = [x1, y1];
             camera.zoom = [winsize[0] / (x2 - x1), winsize[1] / (y2 - y1)];
             camera.trans = [-x1, -y1];
-            this.draw();
+            this.queueDraw();
 
         } else {
             throw "unknown zoom mode '" + mode + "'";
@@ -803,7 +803,7 @@ Summon.Canvas = function (canvas)
         this.world.findBounding(transmat, camera, boundbox);
         this.setVisible(boundbox[0], boundbox[1], boundbox[2], boundbox[3],
                         mode);
-        this.draw();
+        this.queueDraw();
     };
 
 
