@@ -1063,7 +1063,7 @@ var drawElements = Summon.drawElements = function (c, grp, transmat)
 // He may keep some sort of up to date copy at 
 // http://www.federated.com/~jim/canvastext/
 //
-Summon.Text = (function function (Text) {
+Summon.Text = (function (Text) {
 
     var letters = {
 	' ': { width: 16, points: [] },
