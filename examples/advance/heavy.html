@@ -1,12 +1,10 @@
 <html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<link type="text/css" rel="stylesheet" href="../style.css">
 
-<style><!--
-#canvas { border: 1px solid #000; }
-
---></style>
-
-<script language="JavaScript" src="../summon.js"></script>
-<script language="JavaScript"><!--
+<script language="JavaScript" src="../../summon.js"></script>
+<script language="JavaScript">
 
 function drawTree(depth, size)
 {
@@ -54,10 +52,14 @@ function startup()
     s.draw();
 }
 
---></script>
-
+</script>
+</head>
 
 <body onload="startup();">
+
+<div class="topbar">
+<a href="./">summon.js examples</a>
+</div>
 
 <canvas id="canvas" width="800" height="400"></canvas>
 

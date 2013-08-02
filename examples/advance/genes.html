@@ -1,11 +1,10 @@
 <html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<link type="text/css" rel="stylesheet" href="../style.css">
 
-<style><!--
-#canvas { border: 1px solid #000; }
---></style>
-
-<script language="JavaScript" src="../summon.js"></script>
-<script language="JavaScript"><!--
+<script language="JavaScript" src="../../summon.js"></script>
+<script language="JavaScript">
 
 function startup()
 {
@@ -25,7 +24,7 @@ function startup()
     function func(i) {
         return function () {
             alert("gene "+i);
-            };
+        };
     }
 
     // draw genes
@@ -40,8 +39,8 @@ function startup()
         t.push(textLabel("gene "+i, x[0], .25, x[1], 1, {minsize: 10}));
     }
 
-    s.add(translate(100, 0, g, t, h));
-    s.home();
+    s.add(translate(100, 0, style({fill: "#00f"}), g, t, h));
+    s.home("exact");
     s.focusCenter();
     s.zoom(1, .1);
     s.draw();
@@ -50,13 +49,17 @@ function startup()
     s.setBinding(["keydown", "A"], s.doZoom(1.2, 1));
     s.setBinding(["keydown", "Z"], s.doZoom(1/1.2, 1));
     s.setBinding(["mouse", "wheel"], s.doMouseWheel(true, false));
-
 }
 
---></script>
+</script>
+</head>
 
 
 <body onload="startup();">
+
+<div class="topbar">
+<a href="./">summon.js examples</a>
+</div>
 
 <canvas id="canvas" width="800" height="400"></canvas>
 
