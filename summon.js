@@ -245,9 +245,14 @@ var Graphic = Summon.Graphic = function (kind, data)
 Graphic.prototype = new Group;
 Graphic.prototype.children = []; // Graphics can't have children
 
-Graphic.prototype.push = function push(x) {
-    this.data.push(x);
+Graphic.prototype.push = function (value) {
+    this.data.push(value);
 };
+Graphic.prototype.extend = function (values) {
+    for (var i=0; i<values.length; i++)
+        this.data.push(values[i]);
+};
+
 
 Graphic.prototype.findBounding = function findBounding(
     transmat, camera, boundbox) 
@@ -792,6 +797,14 @@ Summon.Canvas = function (canvas)
         } else {
             throw "unknown zoom mode '" + mode + "'";
         }
+    };
+
+    this.getVisible = function() {
+        var winsize = this.getSize();
+        var pos1 = screenToWorld(0, 0);
+        var pos2 = screenToWorld(winsize[0], winsize[1]);
+        
+        return [pos1[0], pos1[1], pos2[0], pos2[1]];
     };
     
     this.home = function(mode) {
