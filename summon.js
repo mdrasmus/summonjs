@@ -102,12 +102,22 @@ var Group = Summon.Group = function (children)
 };
 Group.prototype.kind = "group";
 
-Group.prototype.push = function push(x) {
-    if (x.parent != null)
+Group.prototype.push = function push(child) {
+    if (child.parent != null)
         throw "Element already has parent";
-    x.parent = this;
-    this.children.push(x);
-    return x;
+    child.parent = this;
+    this.children.push(child);
+    return child;
+};
+
+Group.prototype.extend = function (children) {
+    for (var i=0; i<children.length; i++) {
+        var child = children[i];
+        if (child.parent != null)
+            throw "Element already has parent";
+        child.parent = this;
+        this.children.push(child);
+    }
 };
 
 Group.prototype.remove = function remove(x) {
@@ -244,7 +254,6 @@ var Graphic = Summon.Graphic = function (kind, data)
 }
 Graphic.prototype = new Group;
 Graphic.prototype.children = []; // Graphics can't have children
-
 Graphic.prototype.push = function (value) {
     this.data.push(value);
 };
@@ -252,8 +261,6 @@ Graphic.prototype.extend = function (values) {
     for (var i=0; i<values.length; i++)
         this.data.push(values[i]);
 };
-
-
 Graphic.prototype.findBounding = function findBounding(
     transmat, camera, boundbox)
 {
