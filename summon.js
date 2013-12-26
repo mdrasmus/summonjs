@@ -488,12 +488,13 @@ Summon.Canvas = function (canvas)
 
     function mouseMove(e)
     {
+        var mod = getKeyMod(e);
         var pt = getScreenMousePoint(e);
 
 	if (mouseState == "down") {
 	    var delta = [mousePt[0] - pt[0],
 	                 mousePt[1] - pt[1]];
-            var func = bindings.mouse["move"];
+            var func = that.getBinding("mouse", "move", mod);
             if (func)
                 func(pt, delta);
             mousePt = pt;
@@ -507,7 +508,7 @@ Summon.Canvas = function (canvas)
         var mod = getKeyMod(e);
 	mouseState = "down";
 	mousePt = getScreenMousePoint(e);
-        var func = bindings.mouse["down" + mod];
+        var func = that.getBinding("mouse", "down", mod);
         if (func)
             func(pt);
     }
@@ -517,7 +518,7 @@ Summon.Canvas = function (canvas)
         var mod = getKeyMod(e);
 	mouseState = "up";
         var pt = getScreenMousePoint(e);
-        var func = bindings.mouse["up" + mod];
+        var func = that.getBinding("mouse", "up", mod);
         if (func)
             func(pt);
     }
@@ -528,7 +529,7 @@ Summon.Canvas = function (canvas)
         var mod = getKeyMod(e);
 
         // lookup callback
-        var func = bindings.mouse["wheel" + mod];
+        var func = that.getBinding("mouse", "wheel", mod);
         if (func)
             func(delta);
 
@@ -541,15 +542,17 @@ Summon.Canvas = function (canvas)
 
     function keyDown(e)
     {
+        var mod = getKeyMod(e);
+
         // lookup by charCode
         var charCode = e.which;
-        var func = bindings.keydown["code" + charCode];
+        var func = that.getBinding("keydown", "code" + charCode, mod);
         if (func)
             return func();
 
         // lookup by charStr
         var charStr = String.fromCharCode(charCode);
-        func = bindings.keydown[charStr];
+        var func = that.getBinding("keydown", charStr, mod);
         if (func)
             return func();
     }
@@ -887,8 +890,9 @@ Summon.Canvas = function (canvas)
         bindings[event][detail + mod] = func;
     };
 
-    this.getBinding = function(input) {
-        return bindings[input[0]][input[1]];
+    this.getBinding = function(event, detail) {
+        var mod = parseKeyMod(Array.prototype.slice.apply(arguments).slice(2));
+        return bindings[event][detail + mod];
     };
 
     this.setDefaultBindings = function() {
@@ -900,9 +904,9 @@ Summon.Canvas = function (canvas)
         this.setBinding(["keydown", Summon.KEY_LEFT],
                         this.doTranslate(-100, 0));
         this.setBinding(["keydown", Summon.KEY_UP],
-                        this.doTranslate(0, -100));
-        this.setBinding(["keydown", Summon.KEY_DOWN],
                         this.doTranslate(0, 100));
+        this.setBinding(["keydown", Summon.KEY_DOWN],
+                        this.doTranslate(0, -100));
 
         this.setBinding(["keydown", "A"], this.doZoom(1.2, 1.2));
         this.setBinding(["keydown", "Z"], this.doZoom(1/1.2, 1/1.2));
