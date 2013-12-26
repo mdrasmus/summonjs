@@ -491,12 +491,12 @@ Summon.Canvas = function (canvas)
         var pt = getScreenMousePoint(e);
 
 	if (mouseState == "down") {
-	    dx = pt[0] - mousePt[0];
-	    dy = pt[1] - mousePt[1];
-	    camera.trans[0] += dx;
-	    camera.trans[1] += dy;
+	    var delta = [mousePt[0] - pt[0],
+	                 mousePt[1] - pt[1]];
+            var func = bindings.mouse["move"];
+            if (func)
+                func(pt, delta);
             mousePt = pt;
-            that.queueDraw();
 	} else {
             mousePt = pt;
         }
@@ -504,17 +504,23 @@ Summon.Canvas = function (canvas)
 
     function mouseDown(e)
     {
+        var mod = getKeyMod(e);
 	mouseState = "down";
 	mousePt = getScreenMousePoint(e);
+        var func = bindings.mouse["down" + mod];
+        if (func)
+            func(pt);
     }
 
     function mouseUp(e)
     {
+        var mod = getKeyMod(e);
 	mouseState = "up";
         var pt = getScreenMousePoint(e);
-        that.hotspotClick(pt[0], pt[1]);
+        var func = bindings.mouse["up" + mod];
+        if (func)
+            func(pt);
     }
-
 
     function mouseWheel(e)
     {
@@ -535,15 +541,14 @@ Summon.Canvas = function (canvas)
 
     function keyDown(e)
     {
-        var charCode = e.which;
-        var charStr = String.fromCharCode(charCode);
-
         // lookup by charCode
+        var charCode = e.which;
         var func = bindings.keydown["code" + charCode];
         if (func)
             return func();
 
         // lookup by charStr
+        var charStr = String.fromCharCode(charCode);
         func = bindings.keydown[charStr];
         if (func)
             return func();
@@ -648,6 +653,13 @@ Summon.Canvas = function (canvas)
     //=======================
     // camera methods
 
+    this.doScroll = function() {
+        return function(pt, delta) {
+            that.translate(delta[0], delta[1]);
+            that.queueDraw();
+        }
+    }
+
     this.translate = function(x, y) {
 	camera.trans[0] -= x;
 	camera.trans[1] -= y;
@@ -699,7 +711,6 @@ Summon.Canvas = function (canvas)
             that.queueDraw();
         };
     };
-
 
     this.doMouseWheel = function(x, y) {
         return function(delta) {
@@ -803,10 +814,10 @@ Summon.Canvas = function (canvas)
         var winsize = this.getSize();
         var pos1 = screenToWorld(0, 0);
         var pos2 = screenToWorld(winsize[0], winsize[1]);
-        
+
         return [pos1[0], pos1[1], pos2[0], pos2[1]];
     };
-    
+
     this.home = function(mode) {
         if (typeof mode == "undefined")
             mode = "one2one";
@@ -841,28 +852,57 @@ Summon.Canvas = function (canvas)
         return mod;
     }
 
-
-    this.setBinding = function(input, func) {
-        if (input[0] == "keydown") {
-            if (typeof input[1] == "number") {
-                input[1] = "code" + input[1];
+    this.clearAllBindings = function() {
+        for (event in bindings) {
+            if (bindings.hasOwnProperty(event)) {
+                var eventBindings = bindings[event];
+                for (detail in eventBindings) {
+                    if (eventBindings.hasOwnProperty(detail)) {
+                        delete eventBindings[detail];
+                    }
+                }
             }
-
-            bindings.keydown[input[1]] = func;
-        } else if (input[0] == "mouse") {
-            var mod = parseKeyMod(input.slice(2));
-            bindings[input[0]][input[1] + mod] = func;
-        } else {
-            throw "unknown input " + input
         }
     };
 
+    this.clearBinding = function(input) {
+        try {
+            delete bindings[input[0]][input[1]];
+        } catch (error) {
+        }
+    };
+
+    this.setBinding = function(input, func) {
+        var event = input[0];
+        var detail = input[1];
+        var mod = parseKeyMod(input.slice(2));
+        if (event == "keydown" || event == "keyup") {
+            if (typeof detail == "number")
+                detail = "code" + detail;
+        }
+        if (!(event in bindings))
+            bindings[event] = {};
+        if (typeof detail == "undefined")
+            detail = "";
+        bindings[event][detail + mod] = func;
+    };
+
+    this.getBinding = function(input) {
+        return bindings[input[0]][input[1]];
+    };
 
     this.setDefaultBindings = function() {
-        this.setBinding(["keydown", Summon.KEY_RIGHT],this.doTranslate(100, 0));
-        this.setBinding(["keydown", Summon.KEY_LEFT],this.doTranslate(-100, 0));
-        this.setBinding(["keydown", Summon.KEY_UP],this.doTranslate(0, -100));
-        this.setBinding(["keydown", Summon.KEY_DOWN],this.doTranslate(0, 100));
+        this.setBinding(["mouse", "up"],
+                        function(pt) { that.hotspotClick(pt[0], pt[1]); });
+        this.setBinding(["mouse", "move"], this.doScroll());
+        this.setBinding(["keydown", Summon.KEY_RIGHT],
+                        this.doTranslate(100, 0));
+        this.setBinding(["keydown", Summon.KEY_LEFT],
+                        this.doTranslate(-100, 0));
+        this.setBinding(["keydown", Summon.KEY_UP],
+                        this.doTranslate(0, -100));
+        this.setBinding(["keydown", Summon.KEY_DOWN],
+                        this.doTranslate(0, 100));
 
         this.setBinding(["keydown", "A"], this.doZoom(1.2, 1.2));
         this.setBinding(["keydown", "Z"], this.doZoom(1/1.2, 1/1.2));
