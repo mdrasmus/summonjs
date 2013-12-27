@@ -902,9 +902,15 @@ Summon.Canvas = function (canvas)
         return bindings[event][detail + mod];
     };
 
+    this.doClick = function() {
+        var that = this;
+        return function(pt) {
+            that.hotspotClick(pt[0], pt[1]);
+        }
+    };
+
     this.setDefaultBindings = function() {
-        this.setBinding(["mouse", "up"],
-                        function(pt) { that.hotspotClick(pt[0], pt[1]); });
+        this.setBinding(["mouse", "up"], this.doClick());
         this.setBinding(["mouse", "move"], this.doScroll());
         this.setBinding(["keydown", Summon.KEY_RIGHT],
                         this.doTranslate(100, 0));
